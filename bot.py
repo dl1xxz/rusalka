@@ -36,7 +36,6 @@ ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5014057300"))
 GEO_LATITUDE = 45.053805
 GEO_LONGITUDE = 37.086375
 
-# Каталог номеров базы отдыха «Русалочка»
 ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
     "kitchen_2p": {
         "title": "Номер с кухней (апарт.) 2-х местный + доп.место",
@@ -210,7 +209,6 @@ async def send_room_photo(message: Message, room: Dict[str, Any], caption: str, 
     except Exception as e:
         logging.warning(f"Ошибка загрузки фото с сайта rusalo4ka.com: {e}")
 
-    # Fallback
     try:
         await message.answer_photo(photo=room.get("fallback_image_url"), caption=caption, reply_markup=reply_markup)
     except Exception:
@@ -246,14 +244,14 @@ def parse_dates(text: str) -> Tuple[bool, int, str, str, str]:
 # 2. FSM (МАШИНА СОСТОЯНИЙ)
 # =====================================================================
 class BookingFlow(StatesGroup):
-    waiting_dates = State()        # Шаг 1: ввод дат
-    choosing_room = State()        # Шаг 2: выбор категории номера
-    waiting_guests = State()       # Шаг 3: выбор гостей
-    confirm_price = State()        # Шаг 4: расчет (30% предоплата), кнопки «Оплатить» или «Отменить»
-    waiting_fullname = State()     # Шаг 5: Имя и Фамилия
-    waiting_phone = State()        # Шаг 6: Телефон
-    waiting_email = State()        # Шаг 7: E-mail
-    waiting_notes = State()        # Шаг 8: Примечания
+    waiting_dates = State()
+    choosing_room = State()
+    waiting_guests = State()
+    confirm_price = State()
+    waiting_fullname = State()
+    waiting_phone = State()
+    waiting_email = State()
+    waiting_notes = State()
 
 # =====================================================================
 # 3. КЛАВИАТУРЫ
@@ -343,7 +341,7 @@ async def cmd_start(message: Message, state: FSMContext):
         "Большой бассейн с морской водой, уютные эко-домики и номера с оборудованной кухней!\n\n"
         "📅 <b>Период работы базы: с 15 июня по 15 сентября</b>\n"
         "🕒 <b>Заезд — с 13:00 | Выезд — до 11:00</b>\n\n"
-        "Выберите нужный раздел в меню ниже ⬇️️"
+        "Выберите нужный раздел в меню ниже ⬇"
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
@@ -376,8 +374,7 @@ async def back_to_catalog(callback: CallbackQuery):
         "<b>🏡 Категории номеров базы отдыха «Русалочка»:</b>\n\n"
         "Нажмите на категорию для просмотра фотографий и описания:"
     )
-    await message_obj = callback.message
-    await message_obj.answer(text, reply_markup=get_rooms_list_keyboard())
+    await callback.message.answer(text, reply_markup=get_rooms_list_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data.startswith("view_room:"))
@@ -556,10 +553,10 @@ async def faq_back_root(callback: CallbackQuery):
     await callback.answer()
 
 # =====================================================================
-# 5. ПОШАГОВЫЙ СЦЕНАРИЙ БРОНИРОВАНИЯ (ПО ФОРМЕ С САЙТА)
+# 5. ПОШАГОВЫЙ СЦЕНАРИЙ БРОНИРОВАНИЯ
 # =====================================================================
 
-# 1. ЗАПРОС ДАТ (СНАЧАЛА ДАТЫ)
+# 1. ЗАПРОС ДАТ
 @router.message(F.text == "📝 Забронировать")
 @router.callback_query(F.data == "start_booking_fsm")
 async def fsm_step1_dates(event: Message | CallbackQuery, state: FSMContext):
@@ -579,7 +576,6 @@ async def fsm_step1_dates(event: Message | CallbackQuery, state: FSMContext):
 
     await state.set_state(BookingFlow.waiting_dates)
 
-# Если клиент начал бронирование из карточки номера
 @router.callback_query(F.data.startswith("book_room_target:"))
 async def fsm_from_card(callback: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -688,7 +684,6 @@ async def fsm_step4_calc_summary(callback: CallbackQuery, state: FSMContext):
     date_in = data.get("date_in", "")
     date_out = data.get("date_out", "")
 
-    # Точный расчет как в модуле бронирования
     total_price = nights * price_per_night
     prepayment_30 = round(total_price * 0.30)
     balance_70 = total_price - prepayment_30
@@ -768,7 +763,7 @@ async def fsm_step6_phone_received(message: Message, state: FSMContext):
 @router.message(BookingFlow.waiting_email, F.text)
 async def fsm_step7_email_received(message: Message, state: FSMContext):
     email = message.text.strip()
-    if email == "➡️️ Пропустить":
+    if email == "➡️ Пропустить":
         email = "Не указан"
     await state.update_data(email=email)
 
