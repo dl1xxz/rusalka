@@ -1,9 +1,6 @@
 import os
-import re
-import asyncio
 import logging
-from typing import Dict, Any, Tuple
-from datetime import datetime
+from typing import Dict, Any
 
 from dotenv import load_dotenv
 
@@ -19,8 +16,6 @@ from aiogram.types import (
     InputMediaPhoto,
 )
 from aiogram.filters import CommandStart
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
@@ -33,64 +28,68 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8698519060:AAFMCj3zZHAjxrANyC4al0pM-TAblht-s_M")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5014057300"))
 
+# Ссылки проекта
+BOOKING_URL = "https://reservationsteps.ru/rooms/index/8dc26407-5b2f-46e5-8597-ebfc46cf8111?dfrom=15-06-2027&dto=20-06-2027&adults=2&lang=ru"
+REVIEWS_URL = "https://yandex.ru/maps/org/rusalochka/241387417775/reviews/?ll=37.156738%2C45.028213&z=11.94"
+SUPPORT_BOT_URL = "https://t.me/rusalochka1_bot"
+SITE_RULES_URL = "https://rusalo4ka.com/"
+
 GEO_LATITUDE = 45.053805
 GEO_LONGITUDE = 37.086375
 
 VALID_IMG_EXTENSIONS = ('.webp', '.jpg', '.jpeg', '.png')
 
-# Каталог номеров: папки из images/, лимиты гостей, описание и базовая стоимость
+# Каталог номеров базы отдыха «Русалочка»
 ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
     "kitchen_2p": {
         "title": "Номер с кухней (апарт.) 2-х местный + доп.место",
-        "max_guests": 3,
-        "price_per_night": 4500,
         "folder": "images/kitchen_2p",
         "description": (
             "🏡 <b>Номер с кухней (апарт.) 2-х местный + доп.место</b>\n\n"
             "Уютный семейный апартамент с индивидуальной кухонной зоной.\n\n"
             "<b>В номере:</b>\n"
             "• Двуспальная кровать + доп. место (диван / кресло-кровать)\n"
-            "• Индивидуальная кухня: плита, СВЧ, холодильник, посуда, чайник\n"
+            "• Индивидуальная кухня: плита, СВЧ, холодильник, посуда, электрочайник\n"
             "• Сплит-система, ЖК ТВ, Wi-Fi\n"
             "• Санузел с душевой кабиной\n"
-            "• Индивидуальная веранда/балкон для отдыха"
+            "• Индивидуальная веранда/балкон для отдыха\n\n"
+            "👥 <b>Вместимость:</b> до 3 человек\n"
+            "💰 <b>Стоимость:</b> от 4 500 ₽ / сутки"
         ),
     },
     "kitchen_3p": {
         "title": "Номер с кухней (апарт.) 3-х местный + доп.место",
-        "max_guests": 4,
-        "price_per_night": 5500,
         "folder": "images/kitchen_3p",
         "description": (
             "🏡 <b>Номер с кухней (апарт.) 3-х местный + доп.место</b>\n\n"
             "Просторный апартамент для комфортного отдыха всей семьей.\n\n"
             "<b>В номере:</b>\n"
             "• Двуспальная кровать, 1-спальная кровать + доп. место\n"
-            "• Кухонный модуль: варочная панель, СВЧ, холодильник, посуда\n"
+            "• Кухонный модуль: варочная панель, СВЧ, холодильник, посуда, электрочайник\n"
             "• Сплит-система, цифровое ТВ, Wi-Fi\n"
             "• Ванная комната с душем\n"
-            "• Просторная веранда"
+            "• Просторная веранда\n\n"
+            "👥 <b>Вместимость:</b> до 4 человек\n"
+            "💰 <b>Стоимость:</b> от 5 500 ₽ / сутки"
         ),
     },
     "eco_1k_2p": {
         "title": "Эко-домик 1-комнатный 2-х местный + доп.место",
-        "max_guests": 3,
-        "price_per_night": 4000,
         "folder": "images/eco_1k_2p",
         "description": (
             "🏡 <b>Эко-домик 1-комнатный 2-х местный + доп.место</b>\n\n"
             "Отдельный домик из экологически чистого натурального бруса.\n\n"
             "<b>В домике:</b>\n"
             "• Двуспальная кровать + кресло-кровать\n"
-            "• Сплит-система, холодильник, чайник, телевизор\n"
+            "• Сплит-система, холодильник, электрочайник, телевизор\n"
             "• Собственный санузел с душем\n"
-            "• Терраса со столом и стульями на свежем воздухе"
+            "• Терраса со столом и стульями на свежем воздухе\n\n"
+            "👥 <b>Вместимость:</b> до 3 человек\n"
+            "💰 <b>Стоимость:</b> от 4 000 ₽ / сутки"
         ),
     },
     "eco_2k_3p": {
         "title": "Эко-домик 2-комнатный 3-х местный + доп.место",
-        "max_guests": 4,
-        "price_per_night": 6000,
         "folder": "images/eco_2k_3p",
         "description": (
             "🏡 <b>Эко-домик 2-комнатный 3-х местный + доп.место</b>\n\n"
@@ -98,75 +97,75 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "<b>В домике:</b>\n"
             "• 2 изолированные спальные комнаты\n"
             "• 3 основных спальных места + евро-раскладушка\n"
-            "• Кондиционер, холодильник, ТВ, чайник\n"
+            "• Кондиционер, холодильник, ТВ, электрочайник\n"
             "• Санузел с душевой кабиной\n"
-            "• Большая деревянная терраса"
+            "• Большая деревянная терраса\n\n"
+            "👥 <b>Вместимость:</b> до 4 человек\n"
+            "💰 <b>Стоимость:</b> от 6 000 ₽ / сутки"
         ),
     },
     "std_brick_3p": {
         "title": "СТАНДАРТ кирпичный домик 3-х местный",
-        "max_guests": 3,
-        "price_per_night": 3500,
         "folder": "images/std_brick_3p",
         "description": (
             "🏡 <b>СТАНДАРТ кирпичный домик 3-х местный</b>\n\n"
-            "Капитальный прохладный домик для комфортного отдыха 3 человек.\n\n"
+            "Капитальный прохладный домик для отдыха 3 человек.\n\n"
             "<b>В домике:</b>\n"
             "• 3 комфортных спальных места\n"
             "• Сплит-система, холодильник, ТВ\n"
             "• Собственный санузел с душем\n"
-            "• Индивидуальная веранда перед входом"
+            "• Индивидуальная веранда перед входом\n\n"
+            "👥 <b>Вместимость:</b> до 3 человек\n"
+            "💰 <b>Стоимость:</b> от 3 500 ₽ / сутки"
         ),
     },
     "std_wood_2p": {
         "title": "СТАНДАРТ Деревянный домик 2-х местный",
-        "max_guests": 2,
-        "price_per_night": 2800,
         "folder": "images/std_wood_2p",
         "description": (
             "🏡 <b>СТАНДАРТ Деревянный домик 2-х местный</b>\n\n"
             "Уютный деревянный домик для двоих в тишине и зелени.\n\n"
             "<b>В домике:</b>\n"
-            "• 2 спальных места (двуспальная или раздельные кровати)\n"
+            "• 2 спальных места\n"
             "• Кондиционер, холодильник, ТВ\n"
             "• Санузел с душем\n"
-            "• Открытая терраса со столиком"
+            "• Открытая терраса со столиком\n\n"
+            "👥 <b>Вместимость:</b> до 2 человек\n"
+            "💰 <b>Стоимость:</b> от 2 800 ₽ / сутки"
         ),
     },
     "std_2p": {
         "title": "СТАНДАРТ 2-х местный",
-        "max_guests": 2,
-        "price_per_night": 3000,
         "folder": "images/std_2p",
         "description": (
             "🏡 <b>СТАНДАРТ 2-х местный</b>\n\n"
-            "Классический уютный номер для 2 гостей.\n\n"
+            "Классический номер для 2 гостей.\n\n"
             "<b>В номере:</b>\n"
             "• Двуспальная кровать\n"
-            "• Сплит-система, ТВ, холодильник, чайник\n"
+            "• Сплит-система, ТВ, холодильник\n"
             "• Санузел и душевая\n"
-            "• Зона отдыха"
+            "• Зона отдыха\n\n"
+            "👥 <b>Вместимость:</b> до 2 человек\n"
+            "💰 <b>Стоимость:</b> от 3 000 ₽ / сутки"
         ),
     },
     "std_2p_extra": {
         "title": "СТАНДАРТ 2-х местный + доп.место",
-        "max_guests": 3,
-        "price_per_night": 3300,
         "folder": "images/std_2p_extra",
         "description": (
             "🏡 <b>СТАНДАРТ 2-х местный + доп.место</b>\n\n"
-            "Номер с возможностью комфортного размещения до 3 человек.\n\n"
+            "Номер категории стандарт для семьи до 3 человек.\n\n"
             "<b>В номере:</b>\n"
             "• Двуспальная кровать + доп. место\n"
-            "• Сплит-система, телевизор, холодильник, чайник\n"
+            "• Сплит-система, телевизор, холодильник\n"
             "• Санузел с душем\n"
-            "• Терраса для отдыха"
+            "• Терраса для отдыха\n\n"
+            "👥 <b>Вместимость:</b> до 3 человек\n"
+            "💰 <b>Стоимость:</b> от 3 300 ₽ / сутки"
         ),
     },
     "std_3p": {
         "title": "СТАНДАРТ 3-х местный",
-        "max_guests": 3,
-        "price_per_night": 3700,
         "folder": "images/std_3p",
         "description": (
             "🏡 <b>СТАНДАРТ 3-х местный</b>\n\n"
@@ -175,22 +174,24 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• 3 основных спальных места\n"
             "• Кондиционер, холодильник, телевизор\n"
             "• Санузел с душем\n"
-            "• Веранда для вечернего отдыха"
+            "• Веранда для вечернего отдыха\n\n"
+            "👥 <b>Вместимость:</b> до 3 человек\n"
+            "💰 <b>Стоимость:</b> от 3 700 ₽ / сутки"
         ),
     },
     "std_4p": {
         "title": "СТАНДАРТ 4-х местный + доп.место",
-        "max_guests": 5,
-        "price_per_night": 4600,
         "folder": "images/std_4p",
         "description": (
             "🏡 <b>СТАНДАРТ 4-х местный + доп.место</b>\n\n"
             "Семейный просторный номер на 4–5 гостей.\n\n"
             "<b>В номере:</b>\n"
             "• Спальные места: 4 основных + 1 доп. место\n"
-            "• Сплит-система, холодильник, ТВ, чайник\n"
+            "• Сплит-система, холодильник, ТВ\n"
             "• Санузел с душем\n"
-            "• Собственная летняя веранда"
+            "• Собственная летняя веранда\n\n"
+            "👥 <b>Вместимость:</b> до 5 человек\n"
+            "💰 <b>Стоимость:</b> от 4 600 ₽ / сутки"
         ),
     },
 }
@@ -207,7 +208,6 @@ async def send_room_media(message: Message, folder_path: str, caption: str, repl
             if f.lower().endswith(VALID_IMG_EXTENSIONS):
                 images_list.append(os.path.join(folder_path, f))
 
-    # Если в папке несколько фото — отправляем альбом
     if len(images_list) > 1:
         media_group = []
         for idx, img_path in enumerate(images_list[:10]):
@@ -217,60 +217,18 @@ async def send_room_media(message: Message, folder_path: str, caption: str, repl
                 media_group.append(InputMediaPhoto(media=FSInputFile(img_path)))
         
         await message.answer_media_group(media=media_group)
-        await message.answer("Управление категорией:", reply_markup=reply_markup)
-
-    # Если одно фото
+        await message.answer("Выберите действие:", reply_markup=reply_markup)
     elif len(images_list) == 1:
         await message.answer_photo(
             photo=FSInputFile(images_list[0]),
             caption=caption,
             reply_markup=reply_markup
         )
-    # Если папка пуста или еще не загружена
     else:
         await message.answer(text=caption, reply_markup=reply_markup)
 
-def parse_dates(text: str) -> Tuple[bool, int, str, str, str]:
-    pattern = r"(\d{1,2})[./](\d{1,2})(?:[./](\d{4}))?\s*[-—–toдо\s]+\s*(\d{1,2})[./](\d{1,2})(?:[./](\d{4}))?"
-    match = re.search(pattern, text)
-    if not match:
-        return False, 0, "", "", text
-
-    d1, m1, y1, d2, m2, y2 = match.groups()
-    current_year = datetime.now().year
-    season_year = current_year if datetime.now().month <= 9 else current_year + 1
-    year1 = int(y1) if y1 else season_year
-    year2 = int(y2) if y2 else season_year
-
-    try:
-        dt1 = datetime(year1, int(m1), int(d1))
-        dt2 = datetime(year2, int(m2), int(d2))
-        nights = (dt2 - dt1).days
-        if nights <= 0:
-            return False, 0, "", "", text
-        
-        date_in = f"{dt1.strftime('%d.%m.%Y')} (заезд с 13:00)"
-        date_out = f"{dt2.strftime('%d.%m.%Y')} (выезд до 11:00)"
-        full_text = f"{dt1.strftime('%d.%m.%Y')} — {dt2.strftime('%d.%m.%Y')}"
-        return True, nights, date_in, date_out, full_text
-    except ValueError:
-        return False, 0, "", "", text
-
 # =====================================================================
-# 2. FSM (МАШИНА СОСТОЯНИЙ)
-# =====================================================================
-class BookingFlow(StatesGroup):
-    waiting_dates = State()        # Шаг 1: ввод дат
-    choosing_room = State()        # Шаг 2: выбор категории
-    waiting_guests = State()       # Шаг 3: выбор гостей
-    confirm_price = State()        # Шаг 4: расчет (30% предоплата), Оплатить / Отменить
-    waiting_fullname = State()     # Шаг 5: Имя и Фамилия
-    waiting_phone = State()        # Шаг 6: Телефон
-    waiting_email = State()        # Шаг 7: E-mail
-    waiting_notes = State()        # Шаг 8: Примечания
-
-# =====================================================================
-# 3. КЛАВИАТУРЫ
+# КЛАВИАТУРЫ
 # =====================================================================
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
@@ -278,30 +236,9 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
         [KeyboardButton(text="🌴 О базе"), KeyboardButton(text="🎡 Инфраструктура и услуги")],
         [KeyboardButton(text="⭐ Отзывы"), KeyboardButton(text="❓ Вопросы и ответы (FAQ)")],
         [KeyboardButton(text="📞 Контакты и локация")],
+        [KeyboardButton(text="💬 Остались вопросы? Напишите нам")]
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
-
-def get_cancel_reply_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="❌ Отменить бронирование")]],
-        resize_keyboard=True
-    )
-
-def get_phone_reply_keyboard() -> ReplyKeyboardMarkup:
-    keyboard = [
-        [KeyboardButton(text="📱 Отправить контакт", request_contact=True)],
-        [KeyboardButton(text="❌ Отменить бронирование")]
-    ]
-    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
-
-def get_skip_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="➡️ Пропустить")],
-            [KeyboardButton(text="❌ Отменить бронирование")]
-        ],
-        resize_keyboard=True
-    )
 
 def get_rooms_list_keyboard() -> InlineKeyboardMarkup:
     buttons = [
@@ -310,76 +247,81 @@ def get_rooms_list_keyboard() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def get_single_room_keyboard(room_key: str) -> InlineKeyboardMarkup:
+def get_single_room_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🛎 Забронировать этот номер", callback_data=f"book_room_target:{room_key}")],
-            [InlineKeyboardButton(text="⬅️ Назад к категориям", callback_data="back_to_rooms_catalog")]
+            [InlineKeyboardButton(text="🛎 Забронировать этот номер", url=BOOKING_URL)],
+            [InlineKeyboardButton(text="⬅️ Назад к списку категорий", callback_data="back_to_rooms_catalog")]
         ]
     )
 
-def get_rooms_booking_keyboard() -> InlineKeyboardMarkup:
-    buttons = [
-        [InlineKeyboardButton(text=f"🏡 {data['title']} ({data['price_per_night']} ₽/сут)", callback_data=f"select_room_fsm:{key}")]
-        for key, data in ROOMS_CATALOG.items()
-    ]
-    buttons.append([InlineKeyboardButton(text="❌ Отменить бронирование", callback_data="cancel_fsm_cb")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-def get_guests_keyboard(max_guests: int) -> InlineKeyboardMarkup:
-    buttons = [
-        InlineKeyboardButton(text=f"👤 {i} чел.", callback_data=f"set_guests_fsm:{i}")
-        for i in range(1, max_guests + 1)
-    ]
-    rows = [buttons[i:i + 3] for i in range(0, len(buttons), 3)]
-    rows.append([InlineKeyboardButton(text="❌ Отменить бронирование", callback_data="cancel_fsm_cb")])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-def get_payment_decision_keyboard() -> InlineKeyboardMarkup:
+def get_booking_page_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатить (Внести предоплату 30%)", callback_data="pay_prepayment_click")],
-            [InlineKeyboardButton(text="❌ Отменить бронирование", callback_data="cancel_fsm_cb")]
+            [InlineKeyboardButton(text="💳 Перейти к бронированию и оплате", url=BOOKING_URL)],
+            [InlineKeyboardButton(text="💬 Задать вопрос менеджеру", url=SUPPORT_BOT_URL)]
+        ]
+    )
+
+def get_faq_inline_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Во сколько заселение?", callback_data="faq:checkin")],
+            [InlineKeyboardButton(text="Во сколько выселение из номера?", callback_data="faq:checkout")],
+            [InlineKeyboardButton(text="При бронировании нужно вносить предоплату?", callback_data="faq:prepayment")],
+            [InlineKeyboardButton(text="Предоплата возвратная?", callback_data="faq:refund")],
+            [InlineKeyboardButton(text="Возможно размещение с животными?", callback_data="faq:pets")],
+            [InlineKeyboardButton(text="💬 Не нашли ответ? Написать нам", url=SUPPORT_BOT_URL)],
+        ]
+    )
+
+def get_contacts_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="💬 Написать в службу поддержки", url=SUPPORT_BOT_URL)],
+            [InlineKeyboardButton(text="🌐 Открыть сайт rusalo4ka.com", url="https://rusalo4ka.com/")]
         ]
     )
 
 # =====================================================================
-# 4. ОБРАБОТЧИКИ
+# РОУТЕР И ОБРАБОТЧИКИ
 # =====================================================================
 router = Router()
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
-    await state.clear()
+async def cmd_start(message: Message):
     text = (
         "<b>Добро пожаловать в базу отдыха «Русалочка»! 🌊</b>\n\n"
-        "Семейный отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
-        "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
+        "Отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
+        "Ухоженная зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
         "📅 <b>Период работы: с 15 июня по 15 сентября</b>\n"
         "🕒 <b>Заезд — с 13:00 | Выезд — до 11:00</b>\n\n"
-        "Выберите нужный раздел в меню ниже ⬇️️"
+        "Ознакомьтесь с номерным фондом и услугами базы в меню ниже ⬇️"
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
-@router.message(F.text == "❌ Отменить бронирование")
-async def cancel_booking_text(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer("Бронирование отменено.", reply_markup=get_main_menu_keyboard())
+# --- КНОПКА ПОДДЕРЖКИ В МЕНЮ ---
+@router.message(F.text.in_(["💬 Остались вопросы? Напишите нам", "💬 Задать вопрос"]))
+async def ask_question_menu(message: Message):
+    text = (
+        "<b>💬 Есть вопросы по отдыху или бронированию?</b>\n\n"
+        "Вы можете напрямую задать любой вопрос нашей службе поддержки.\n"
+        "Нажмите кнопку ниже для перехода в чат ⬇️"
+    )
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="💬 Написать в чат поддержки", url=SUPPORT_BOT_URL)]
+        ]
+    )
+    await message.answer(text, reply_markup=kb)
 
-@router.callback_query(F.data == "cancel_fsm_cb")
-async def cancel_fsm_callback(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.message.delete()
-    await callback.message.answer("Бронирование отменено.", reply_markup=get_main_menu_keyboard())
-    await callback.answer()
-
-# --- НАШИ НОМЕРА ---
+# --- РАЗДЕЛ: НАШИ НОМЕРА ---
 @router.message(F.text == "🏡 Наши номера")
 async def show_rooms(message: Message):
     text = (
-        "<b>🏡 Категории номеров базы отдыха «Русалочка»:</b>\n\n"
+        "<b>🏡 Номерной фонд базы отдыха «Русалочка»:</b>\n\n"
         "Нажмите на интересующую категорию, чтобы посмотреть реальные фотографии, "
-        "комплектацию и условия проживания:"
+        "оснащение и стоимость номеров:"
     )
     await message.answer(text, reply_markup=get_rooms_list_keyboard())
 
@@ -387,7 +329,7 @@ async def show_rooms(message: Message):
 async def back_to_catalog(callback: CallbackQuery):
     await callback.message.delete()
     text = (
-        "<b>🏡 Категории номеров базы отдыха «Русалочка»:</b>\n\n"
+        "<b>🏡 Номерной фонд базы отдыха «Русалочка»:</b>\n\n"
         "Нажмите на категорию для просмотра фотографий и описания:"
     )
     await callback.message.answer(text, reply_markup=get_rooms_list_keyboard())
@@ -402,25 +344,36 @@ async def view_single_room(callback: CallbackQuery):
         return
 
     await callback.message.delete()
-    caption = (
-        f"{room['description']}\n\n"
-        f"👥 <b>Вместимость:</b> до {room['max_guests']} человек\n"
-        f"💰 <b>Стоимость:</b> от {room['price_per_night']} ₽ / сутки"
-    )
     await send_room_media(
         message=callback.message,
         folder_path=room.get("folder", ""),
-        caption=caption,
-        reply_markup=get_single_room_keyboard(room_key)
+        caption=room["description"],
+        reply_markup=get_single_room_keyboard()
     )
     await callback.answer()
 
-# --- ОТЗЫВЫ ---
+# --- РАЗДЕЛ: ЗАБРОНИРОВАТЬ ---
+@router.message(F.text == "📝 Забронировать")
+async def show_booking_info(message: Message):
+    text = (
+        "<b>📝 Онлайн-бронирование номеров</b>\n\n"
+        "В нашем официальном модуле бронирования вы можете в реальном времени выбрать удобные даты отдыха, "
+        "узнать актуальное наличие свободных номеров и моментально оформить бронь с гарантией!\n\n"
+        "📌 <b>Условия проживания:</b>\n"
+        "• <b>Период работы:</b> с 15 июня по 15 сентября\n"
+        "• <b>Заезд:</b> с 13:00 | <b>Выезд:</b> до 11:00\n"
+        "• <b>Предоплата для брони:</b> 30.00% от стоимости\n"
+        "• <b>Остаток:</b> оплачивается при заселении\n"
+        "• <b>Бесплатная отмена:</b> возможна за 14 дней до заезда\n\n"
+        "Нажмите кнопку ниже, чтобы перейти к выбору дат и категории ⬇️"
+    )
+    await message.answer(text, reply_markup=get_booking_page_keyboard())
+
+# --- РАЗДЕЛ: ОТЗЫВЫ ---
 @router.message(F.text == "⭐ Отзывы")
 async def show_reviews(message: Message):
-    url = "https://yandex.ru/maps/org/rusalochka/241387417775/reviews/?ll=37.156738%2C45.028213&z=11.94"
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⭐ Открыть отзывы на Яндекс.Картах", url=url)]]
+        inline_keyboard=[[InlineKeyboardButton(text="⭐ Открыть отзывы на Яндекс.Картах", url=REVIEWS_URL)]]
     )
     await message.answer(
         "<b>⭐ Отзывы наших гостей:</b>\n\n"
@@ -429,7 +382,7 @@ async def show_reviews(message: Message):
         reply_markup=kb
     )
 
-# --- ИНФРАСТРУКТУРА ---
+# --- РАЗДЕЛ: ИНФРАСТРУКТУРА И УСЛУГИ ---
 @router.message(F.text == "🎡 Инфраструктура и услуги")
 async def show_infra(message: Message):
     text = (
@@ -447,21 +400,17 @@ async def show_infra(message: Message):
         "💲 <b>ДОПОЛНИТЕЛЬНЫЕ УСЛУГИ:</b>\n\n"
         "🎨 <b>Студия творчества и шоу</b>\n"
         "Регулярные шоу-программы и мастер-классы (создание слаймов, блеск-тату, роспись футболок, кепок и фигурок).\n\n"
-        "🚲 <b>Полезный сервис</b>\n"
-        "Прокат детских колясок (от 0 до 5 лет), детских и взрослых велосипедов/самокатов. Прачечная и гладильная комната. "
-        "Зарядная станция для авто GB/T 7kwt (Цена 22₽/ 1 кВт.ч).\n\n"
-        "☕ <b>Вкусные радости</b>\n"
-        "Натуральный зерновой кофе, прохладительные напитки и вкусный шашлык, который приготовят прямо при вас."
+        "🧺 <b>Полезный сервис</b>\n"
+        "Прачечная и гладильная комната.\n"
+        "Зарядная станция для электромобилей GB/T 7kwt (Цена 22₽ / 1 кВт.ч)."
     )
     await message.answer(text)
 
-# --- О БАЗЕ ---
+# --- РАЗДЕЛ: О БАЗЕ ---
 @router.message(F.text == "🌴 О базе")
 async def show_about(message: Message):
     text = (
-        "<b>🌴 Семейная база отдыха «Русалочка»</b>\n\n"
-        "«Рай для ваших детей и спокойный отдых для родителей!»\n"
-        "Пока взрослые расслабляются, детям всегда есть чем заняться.\n\n"
+        "<b>🌴 База отдыха «Русалочка»</b>\n\n"
         "• Закрытая охраняемая зеленая территория\n"
         "• Шаговая доступность к просторному пляжу и теплому морю\n"
         "• Детский игровой комплекс, анимация и уютная атмосфера\n"
@@ -473,368 +422,82 @@ async def show_about(message: Message):
     )
     await message.answer(text, reply_markup=kb)
 
-# --- КОНТАКТЫ ---
+# --- РАЗДЕЛ: КОНТАКТЫ И ЛОКАЦИЯ ---
 @router.message(F.text == "📞 Контакты и локация")
 async def show_contacts(message: Message):
     text = (
         "<b>📞 Контакты базы отдыха «Русалочка»:</b>\n\n"
         "📍 <b>Адрес:</b> Краснодарский край, г. Анапа, ст. Благовещенская, б/о «Русалочка»\n"
         "📞 <b>Отдел бронирования:</b> +7 (918) 47-74-366\n"
-        "💬 <b>Telegram:</b> @BAZU193\n"
+        "💬 <b>Чат с ботом/менеджером:</b> @rusalochka1_bot\n"
         "✉️ <b>E-mail:</b> anaparusalochka@rambler.ru\n"
         "🌐 <b>Сайт:</b> https://rusalo4ka.com/\n\n"
-        "📍 <i>Геолокация отправлена ниже:</i>"
+        "📍 <i>Ниже отправлена геолокация для Яндекс.Карт и навигатора:</i>"
     )
-    await message.answer(text)
+    await message.answer(text, reply_markup=get_contacts_keyboard())
     await message.answer_location(latitude=GEO_LATITUDE, longitude=GEO_LONGITUDE)
 
-# --- FAQ ---
+# --- РАЗДЕЛ: ЧАСТО ЗАДАВАЕМЫЕ ВОПРОСЫ (ТОЧЬ В ТОЧЬ С САЙТА) ---
 @router.message(F.text == "❓ Вопросы и ответы (FAQ)")
 async def show_faq(message: Message):
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🕒 Время заезда и выезда", callback_data="faq:checkin")],
-            [InlineKeyboardButton(text="🐾 Можно ли с собаками?", callback_data="faq:pets")],
-            [InlineKeyboardButton(text="💳 Гарантия брони и оплата", callback_data="faq:payment")],
-            [InlineKeyboardButton(text="📍 Как к вам добраться?", callback_data="faq:route")],
-        ]
-    )
-    await message.answer("<b>Часто задаваемые вопросы (FAQ):</b>", reply_markup=kb)
+    await message.answer("<b>Часто задаваемые вопросы</b>", reply_markup=get_faq_inline_keyboard())
 
 @router.callback_query(F.data.startswith("faq:"))
 async def faq_click(callback: CallbackQuery):
     action = callback.data.split(":")[1]
-    answers = {
-        "checkin": (
-            "<b>🕒 Время заезда и выезда:</b>\n\n"
-            "• <b>Заезд:</b> с <b>13:00</b>\n"
-            "• <b>Выезд:</b> до <b>11:00</b>"
-        ),
-        "pets": (
-            "<b>🐾 Размещение с животными:</b>\n\n"
-            "— Возможно исключительно с декоративными собаками до 6 кг в номерах категории «Номер с кухней (апарт.)» эко.\n"
-            "— Тариф: 800 руб./сутки.\n"
-            "— Выгул собак на территории базы ЗАПРЕЩЕН."
-        ),
-        "payment": (
-            "<b>💳 Гарантия бронирования и оплата:</b>\n\n"
-            "• Для подтверждения бронирования необходимо произвести оплату в размере <b>30.00% от общей стоимости</b>.\n"
-            "• Оставшаяся сумма (70%) оплачивается при заселении.\n"
-            "• Бесплатная отмена возможна за 14 дней до даты заезда."
-        ),
-        "route": "<b>📍 Адрес:</b> Краснодарский край, г. Анапа, станица Благовещенская, б/о «Русалочка»."
+    
+    faq_data = {
+        "checkin": {
+            "q": "Во сколько заселение?",
+            "a": "— с 13:00, но если Вы приедете раньше и ваш номер будет уже свободен, мы Вас заселим раньше."
+        },
+        "checkout": {
+            "q": "Во сколько выселение из номера?",
+            "a": "— освободить номер нужно до 11:00, ключи, брелоки и браслеты от номера нужно сдать в администрации."
+        },
+        "prepayment": {
+            "q": "При бронировании нужно вносить предоплату?",
+            "a": "— бронирование выбранной категории номера (домика) производится после перечисления предоплаты (30% от полной стоимости проживания)."
+        },
+        "refund": {
+            "q": "Предоплата возвратная?",
+            "a": "— бесплатная отмена бронирования возможна за 14 дней до забронированной даты, после - взимается 100% от размера предоплаты. В экстренном случае обращайтесь на электронную почту."
+        },
+        "pets": {
+            "q": "Возможно размещение с животными?",
+            "a": (
+                "— Возможность размещения исключительно с декоративными собаками, весом до 6 кг., предусмотрена в номерах категории «Номер с кухней (апарт.)» эко.\n\n"
+                "— Тариф на размещение: 800 руб./сутки.\n\n"
+                "— Выгул собак на территории Базы отдыха «Русалочка» ЗАПРЕЩЕН."
+            )
+        }
     }
-    ans = answers.get(action, "Информация уточняется.")
-    back_kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="faq_back_root")]]
-    )
-    await callback.message.edit_text(ans, reply_markup=back_kb)
+
+    item = faq_data.get(action)
+    if not item:
+        await callback.answer("Вопрос не найден", show_alert=True)
+        return
+
+    text = f"<b>{item['q']}</b>\n\n{item['a']}"
+
+    buttons = []
+    if action == "pets":
+        buttons.append([InlineKeyboardButton(text="Посмотреть полные правила", url=SITE_RULES_URL)])
+    
+    buttons.append([InlineKeyboardButton(text="💬 Задать другой вопрос", url=SUPPORT_BOT_URL)])
+    buttons.append([InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="faq_back_root")])
+
+    back_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await callback.message.edit_text(text, reply_markup=back_kb)
     await callback.answer()
 
 @router.callback_query(F.data == "faq_back_root")
 async def faq_back_root(callback: CallbackQuery):
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🕒 Время заезда и выезда", callback_data="faq:checkin")],
-            [InlineKeyboardButton(text="🐾 Можно ли с собаками?", callback_data="faq:pets")],
-            [InlineKeyboardButton(text="💳 Гарантия брони и оплата", callback_data="faq:payment")],
-            [InlineKeyboardButton(text="📍 Как к вам добраться?", callback_data="faq:route")],
-        ]
-    )
-    await callback.message.edit_text("<b>Часто задаваемые вопросы (FAQ):</b>", reply_markup=kb)
+    await callback.message.edit_text("<b>Часто задаваемые вопросы</b>", reply_markup=get_faq_inline_keyboard())
     await callback.answer()
 
 # =====================================================================
-# 5. ПОШАГОВЫЙ СЦЕНАРИЙ БРОНИРОВАНИЯ
-# =====================================================================
-
-# 1. ЗАПРОС ДАТ (СНАЧАЛА ДАТЫ)
-@router.message(F.text == "📝 Забронировать")
-async def fsm_step1_dates(message: Message, state: FSMContext):
-    await state.clear()
-    prompt = (
-        "📅 <b>Шаг 1 из 5: Выберите даты заезда и выезда</b>\n\n"
-        "База отдыха принимает гостей в летний сезон <b>с 15 июня по 15 сентября</b>.\n"
-        "🕒 <i>Заезд с 13:00, выезд до 11:00</i>\n\n"
-        "Введите желаемые даты в формате: <b>ДД.ММ - ДД.ММ</b>\n"
-        "<i>Например: 20.06 - 30.06 или 01.07 - 10.07</i>"
-    )
-    await message.answer(prompt, reply_markup=get_cancel_reply_keyboard())
-    await state.set_state(BookingFlow.waiting_dates)
-
-@router.callback_query(F.data.startswith("book_room_target:"))
-async def fsm_from_card(callback: CallbackQuery, state: FSMContext):
-    await state.clear()
-    room_key = callback.data.split(":")[1]
-    room = ROOMS_CATALOG.get(room_key)
-
-    await state.update_data(preselected_room_key=room_key)
-    prompt = (
-        f"Вы выбрали: <b>{room['title']}</b>\n\n"
-        "📅 <b>Шаг 1 из 5: Даты проживания</b>\n"
-        "База работает <b>с 15 июня по 15 сентября</b> (заезд с 13:00, выезд до 11:00).\n\n"
-        "Введите даты заезда и выезда (например: <b>01.07 - 10.07</b>):"
-    )
-    await callback.message.answer(prompt, reply_markup=get_cancel_reply_keyboard())
-    await callback.answer()
-    await state.set_state(BookingFlow.waiting_dates)
-
-# 2. ОБРАБОТКА ДАТ И ПОКАЗ КАТЕГОРИЙ
-@router.message(BookingFlow.waiting_dates, F.text)
-async def fsm_step2_process_dates(message: Message, state: FSMContext):
-    raw_dates = message.text.strip()
-    is_valid, nights, date_in, date_out, full_dates_str = parse_dates(raw_dates)
-
-    if not is_valid or nights <= 0:
-        await message.answer(
-            "⚠️ Пожалуйста, введите корректные даты заезда и выезда через дефис.\n"
-            "<i>Пример: 15.06 - 25.06 или 05.07 - 12.07</i>"
-        )
-        return
-
-    await state.update_data(
-        nights=nights,
-        date_in=date_in,
-        date_out=date_out,
-        full_dates_str=full_dates_str
-    )
-
-    data = await state.get_data()
-    preselected = data.get("preselected_room_key")
-
-    if preselected and preselected in ROOMS_CATALOG:
-        room = ROOMS_CATALOG[preselected]
-        await state.update_data(
-            room_key=preselected,
-            room_title=room["title"],
-            price_per_night=room["price_per_night"],
-            max_guests=room["max_guests"]
-        )
-        await message.answer(
-            f"📅 <b>Заезд:</b> {date_in}\n"
-            f"📅 <b>Выезд:</b> {date_out}\n"
-            f"🌙 <b>Ночей:</b> {nights}\n"
-            f"🏡 <b>Категория:</b> {room['title']}\n\n"
-            f"👥 <b>Шаг 3 из 5: Количество гостей</b>\n"
-            f"Вместимость номера: <b>до {room['max_guests']} человек</b>.\n"
-            "Выберите количество гостей:",
-            reply_markup=get_guests_keyboard(room["max_guests"])
-        )
-        await state.set_state(BookingFlow.waiting_guests)
-    else:
-        await message.answer(
-            f"📅 <b>Период:</b> {full_dates_str} ({nights} ноч.)\n\n"
-            "🏡 <b>Шаг 2 из 5: Выберите желаемую категорию номера:</b>",
-            reply_markup=get_rooms_booking_keyboard()
-        )
-        await state.set_state(BookingFlow.choosing_room)
-
-# ВЫБОР НОМЕРА
-@router.callback_query(BookingFlow.choosing_room, F.data.startswith("select_room_fsm:"))
-async def fsm_step3_select_room(callback: CallbackQuery, state: FSMContext):
-    room_key = callback.data.split(":")[1]
-    room = ROOMS_CATALOG.get(room_key)
-    if not room:
-        await callback.answer("Ошибка выбора категории", show_alert=True)
-        return
-
-    await state.update_data(
-        room_key=room_key,
-        room_title=room["title"],
-        price_per_night=room["price_per_night"],
-        max_guests=room["max_guests"]
-    )
-
-    data = await state.get_data()
-    nights = data.get("nights", 1)
-
-    await callback.message.edit_text(
-        f"Вы выбрали: <b>{room['title']}</b>\n"
-        f"💰 Стоимость за сутки: <b>{room['price_per_night']} ₽</b>\n"
-        f"🌙 Ночей: <b>{nights}</b>\n\n"
-        f"👥 <b>Шаг 3 из 5: Выберите количество гостей</b> (максимум до {room['max_guests']} чел.):",
-        reply_markup=get_guests_keyboard(room["max_guests"])
-    )
-    await state.set_state(BookingFlow.waiting_guests)
-    await callback.answer()
-
-# 3. РАСЧЕТ СТОИМОСТИ (30% ПРЕДОПЛАТА)
-@router.callback_query(BookingFlow.waiting_guests, F.data.startswith("set_guests_fsm:"))
-async def fsm_step4_calc_summary(callback: CallbackQuery, state: FSMContext):
-    guests_count = int(callback.data.split(":")[1])
-    data = await state.get_data()
-
-    room_title = data.get("room_title", "Номер")
-    nights = data.get("nights", 1)
-    price_per_night = data.get("price_per_night", 3500)
-    date_in = data.get("date_in", "")
-    date_out = data.get("date_out", "")
-
-    total_price = nights * price_per_night
-    prepayment_30 = round(total_price * 0.30)
-    balance_70 = total_price - prepayment_30
-
-    await state.update_data(
-        guests_count=guests_count,
-        total_price=total_price,
-        prepayment=prepayment_30,
-        balance=balance_70
-    )
-
-    await callback.message.delete()
-
-    summary_text = (
-        "📋 <b>ДЕТАЛИЗАЦИЯ И РАСЧЕТ СТОИМОСТИ</b>\n"
-        "────────────────────────\n"
-        f"🏡 <b>1 номер:</b> {room_title}\n"
-        f"📥 <b>Заезд:</b> {date_in}\n"
-        f"📤 <b>Выезд:</b> {date_out}\n"
-        f"🌙 <b>Период:</b> {nights} ночей\n"
-        f"👥 <b>Количество гостей:</b> {guests_count} чел.\n\n"
-        f"💵 <b>Проживание ({nights} ноч.):</b> {total_price:,} ₽\n"
-        "🍽 <b>Питание:</b> По выбору на месте\n"
-        "────────────────────────\n"
-        f"🧾 <b>ИТОГО К ОПЛАТЕ:</b> <b>{total_price:,} ₽</b>\n"
-        f"💳 <b>Предоплата (30.00%):</b> <b>{prepayment_30:,} ₽</b>\n"
-        f"🤝 <b>Остаток при заселении (70%):</b> {balance_70:,} ₽\n\n"
-        "📌 <b>Тариф:</b> Акция «Сезонное предложение»\n"
-        "🔒 <b>Гарантия бронирования:</b>\n"
-        "<i>Для подтверждения бронирования необходимо произвести оплату в размере 30.00% от общей стоимости.</i>\n\n"
-        "🛡 <b>Отмена бронирования:</b>\n"
-        "<i>Бесплатная отмена бронирования возможна за 14 дней до даты заезда. При отмене менее чем за 14 дней взимается штраф в размере внесенной предоплаты.</i>"
-    ).replace(",", " ")
-
-    await callback.message.answer(summary_text, reply_markup=get_payment_decision_keyboard())
-    await state.set_state(BookingFlow.confirm_price)
-    await callback.answer()
-
-# 4. НАЖАТИЕ «ОПЛАТИТЬ (ВНЕСТИ ПРЕДОПЛАТУ 30%)»
-@router.callback_query(BookingFlow.confirm_price, F.data == "pay_prepayment_click")
-async def fsm_step5_start_customer_info(callback: CallbackQuery, state: FSMContext):
-    await callback.message.delete()
-    await callback.message.answer(
-        "👤 <b>Шаг 4 из 5: Данные заказчика</b>\n\n"
-        "Укажите ваши <b>Имя и Фамилию</b> (как в паспорте для договора бронирования):",
-        reply_markup=get_cancel_reply_keyboard()
-    )
-    await state.set_state(BookingFlow.waiting_fullname)
-    await callback.answer()
-
-# 5. ИМЯ И ФАМИЛИЯ
-@router.message(BookingFlow.waiting_fullname, F.text)
-async def fsm_step5_name_received(message: Message, state: FSMContext):
-    await state.update_data(fullname=message.text.strip())
-    await message.answer(
-        "📱 <b>Шаг 5 из 5: Контактный телефон</b>\n\n"
-        "Нажмите кнопку <b>«Отправить контакт»</b> ниже или введите номер вручную:",
-        reply_markup=get_phone_reply_keyboard()
-    )
-    await state.set_state(BookingFlow.waiting_phone)
-
-# 6. ТЕЛЕФОН
-@router.message(BookingFlow.waiting_phone, F.contact | F.text)
-async def fsm_step6_phone_received(message: Message, state: FSMContext):
-    phone = message.contact.phone_number if message.contact else message.text.strip()
-    await state.update_data(phone=phone)
-
-    await message.answer(
-        "✉️ <b>Укажите ваш E-mail:</b>\n"
-        "На него будет отправлен ваучер бронирования и чек.\n"
-        "<i>(Или нажмите «Пропустить», если хотите получить подтверждение только в Telegram)</i>",
-        reply_markup=get_skip_keyboard()
-    )
-    await state.set_state(BookingFlow.waiting_email)
-
-# 7. EMAIL
-@router.message(BookingFlow.waiting_email, F.text)
-async def fsm_step7_email_received(message: Message, state: FSMContext):
-    email = message.text.strip()
-    if email == "➡️ Пропустить":
-        email = "Не указан"
-    await state.update_data(email=email)
-
-    await message.answer(
-        "✍️ <b>Примечания и пожелания:</b>\n"
-        "Укажите пожелания (детская кроватка, парковочное место, ориентировочное время прибытия).\n"
-        "<i>Либо нажмите «Пропустить»:</i>",
-        reply_markup=get_skip_keyboard()
-    )
-    await state.set_state(BookingFlow.waiting_notes)
-
-# 8. ФИНИШ
-@router.message(BookingFlow.waiting_notes, F.text)
-async def fsm_step8_finish(message: Message, state: FSMContext, bot: Bot):
-    notes = message.text.strip()
-    if notes == "➡️ Пропустить":
-        notes = "Без особых примечаний"
-
-    data = await state.get_data()
-    room_title = data.get("room_title", "Номер")
-    nights = data.get("nights", 1)
-    date_in = data.get("date_in", "")
-    date_out = data.get("date_out", "")
-    guests_count = data.get("guests_count", 1)
-    total_price = data.get("total_price", 0)
-    prepayment = data.get("prepayment", 0)
-    balance = data.get("balance", 0)
-    fullname = data.get("fullname", "Гость")
-    phone = data.get("phone", "Не указан")
-    email = data.get("email", "Не указан")
-
-    order_id = datetime.now().strftime("%d%m-%H%M")
-
-    # Ответ клиенту
-    client_response = (
-        f"🎉 <b>Спасибо, {fullname}! Заявка №{order_id} оформлена!</b>\n\n"
-        "📋 <b>Ваш расчет бронирования:</b>\n"
-        f"• <b>Категория:</b> {room_title}\n"
-        f"• <b>Заезд:</b> {date_in}\n"
-        f"• <b>Выезд:</b> {date_out}\n"
-        f"• <b>Гости:</b> {guests_count} чел. ({nights} ноч.)\n"
-        f"• <b>Сумма бронирования:</b> {total_price:,} ₽\n"
-        f"• <b>Предоплата (30%):</b> <b>{prepayment:,} ₽</b>\n"
-        f"• <b>Остаток при заезде (70%):</b> {balance:,} ₽\n"
-        f"• <b>Телефон:</b> {phone}\n"
-        f"• <b>E-mail:</b> {email}\n"
-        f"• <b>Примечания:</b> {notes}\n\n"
-        "💳 <b>Оплата предоплаты:</b>\n"
-        "Администратор базы отдыха сейчас свяжется с вами по телефону для подтверждения наличия мест "
-        "и направит официальные реквизиты/ссылку для внесения 30% предоплаты."
-    ).replace(",", " ")
-
-    await message.answer(client_response, reply_markup=get_main_menu_keyboard())
-
-    # Мгновенная заявка администратору в Telegram (ID: 5014057300)
-    username = f"@{message.from_user.username}" if message.from_user.username else "нет @username"
-    user_id = message.from_user.id
-
-    admin_notification = (
-        f"🔥 <b>НОВАЯ ЗАЯВКА НА БРОНИРОВАНИЕ (№{order_id})</b>\n\n"
-        f"🏡 <b>Категория:</b> {room_title}\n"
-        f"📥 <b>Заезд:</b> {date_in}\n"
-        f"📤 <b>Выезд:</b> {date_out} ({nights} ноч.)\n"
-        f"👥 <b>Гости:</b> {guests_count} чел.\n\n"
-        f"💰 <b>Общая сумма:</b> <b>{total_price:,} ₽</b>\n"
-        f"💳 <b>Предоплата 30%:</b> <b>{prepayment:,} ₽</b>\n"
-        f"🤝 <b>Остаток (при заезде):</b> {balance:,} ₽\n\n"
-        f"👤 <b>Заказчик:</b> {fullname}\n"
-        f"📞 <b>Телефон:</b> <code>{phone}</code>\n"
-        f"✉️ <b>E-mail:</b> {email}\n"
-        f"📝 <b>Примечания:</b> <i>{notes}</i>\n\n"
-        f"📱 <b>Telegram:</b> {username} (ID: <code>{user_id}</code>)\n"
-        f"⏰ <b>Время заявки:</b> {datetime.now().strftime('%d.%m.%Y в %H:%M')}"
-    ).replace(",", " ")
-
-    if ADMIN_CHAT_ID:
-        try:
-            await bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_notification)
-        except Exception as e:
-            logging.error(f"Не удалось доставить уведомление администратору {ADMIN_CHAT_ID}: {e}")
-
-    await state.clear()
-
-# =====================================================================
-# 6. ТОЧКА ВХОДА
+# ТОЧКА ВХОДА (RUNNER)
 # =====================================================================
 async def main():
     logging.basicConfig(
