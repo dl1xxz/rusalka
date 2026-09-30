@@ -5,7 +5,6 @@ import logging
 from typing import Dict, Any, Tuple
 from datetime import datetime
 
-import aiohttp
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -16,7 +15,8 @@ from aiogram.types import (
     KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    BufferedInputFile,
+    FSInputFile,
+    InputMediaPhoto,
 )
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -36,182 +36,198 @@ ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5014057300"))
 GEO_LATITUDE = 45.053805
 GEO_LONGITUDE = 37.086375
 
+VALID_IMG_EXTENSIONS = ('.webp', '.jpg', '.jpeg', '.png')
+
+# Каталог номеров: папки из images/, лимиты гостей, описание и базовая стоимость
 ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
     "kitchen_2p": {
         "title": "Номер с кухней (апарт.) 2-х местный + доп.место",
         "max_guests": 3,
         "price_per_night": 4500,
+        "folder": "images/kitchen_2p",
         "description": (
             "🏡 <b>Номер с кухней (апарт.) 2-х местный + доп.место</b>\n\n"
             "Уютный семейный апартамент с индивидуальной кухонной зоной.\n\n"
             "<b>В номере:</b>\n"
-            "• Двуспальная кровать + доп. место (диван/кресло-кровать)\n"
-            "• Оборудованная кухня: плита, СВЧ, холодильник, посуда, чайник\n"
+            "• Двуспальная кровать + доп. место (диван / кресло-кровать)\n"
+            "• Индивидуальная кухня: плита, СВЧ, холодильник, посуда, чайник\n"
             "• Сплит-система, ЖК ТВ, Wi-Fi\n"
             "• Санузел с душевой кабиной\n"
-            "• Индивидуальная веранда/балкон\n"
-            "🏊‍♂️ <i>Бассейн включен в стоимость проживания бесплатно!</i>"
+            "• Индивидуальная веранда/балкон для отдыха"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/c3c/600_400_1/c3c97d74db5e26b8cb7974531be32717.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80",
     },
     "kitchen_3p": {
         "title": "Номер с кухней (апарт.) 3-х местный + доп.место",
         "max_guests": 4,
         "price_per_night": 5500,
+        "folder": "images/kitchen_3p",
         "description": (
             "🏡 <b>Номер с кухней (апарт.) 3-х местный + доп.место</b>\n\n"
-            "Просторный апартамент для семейного отпуска.\n\n"
+            "Просторный апартамент для комфортного отдыха всей семьей.\n\n"
             "<b>В номере:</b>\n"
             "• Двуспальная кровать, 1-спальная кровать + доп. место\n"
             "• Кухонный модуль: варочная панель, СВЧ, холодильник, посуда\n"
-            "• Сплит-система, кабельное ТВ, Wi-Fi\n"
+            "• Сплит-система, цифровое ТВ, Wi-Fi\n"
             "• Ванная комната с душем\n"
-            "• Летняя зона отдыха на веранде\n"
-            "🏊‍♂️ <i>Бассейн включен в стоимость проживания бесплатно!</i>"
+            "• Просторная веранда"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/d3c/600_400_1/d3c92df78508e92fba8933e146eb4a05.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1000&q=80",
     },
     "eco_1k_2p": {
         "title": "Эко-домик 1-комнатный 2-х местный + доп.место",
         "max_guests": 3,
         "price_per_night": 4000,
+        "folder": "images/eco_1k_2p",
         "description": (
             "🏡 <b>Эко-домик 1-комнатный 2-х местный + доп.место</b>\n\n"
             "Отдельный домик из экологически чистого натурального бруса.\n\n"
             "<b>В домике:</b>\n"
             "• Двуспальная кровать + кресло-кровать\n"
             "• Сплит-система, холодильник, чайник, телевизор\n"
-            "• Санузел с душем\n"
-            "• Собственная терраса со столом и стульями\n"
-            "🏊‍♂️ <i>Бассейн включен в стоимость проживания бесплатно!</i>"
+            "• Собственный санузел с душем\n"
+            "• Терраса со столом и стульями на свежем воздухе"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/e7a/600_400_1/e7a6d8feea4cb804da6c39a3f9e9cf24.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1000&q=80",
     },
     "eco_2k_3p": {
         "title": "Эко-домик 2-комнатный 3-х местный + доп.место",
         "max_guests": 4,
         "price_per_night": 6000,
+        "folder": "images/eco_2k_3p",
         "description": (
             "🏡 <b>Эко-домик 2-комнатный 3-х местный + доп.место</b>\n\n"
-            "Двухкомнатный коттедж из бруса для семьи до 4 человек.\n\n"
+            "Двухкомнатный коттедж из бруса для большой семьи.\n\n"
             "<b>В домике:</b>\n"
-            "• 2 изолированные комнаты из эко-бруса\n"
+            "• 2 изолированные спальные комнаты\n"
             "• 3 основных спальных места + евро-раскладушка\n"
             "• Кондиционер, холодильник, ТВ, чайник\n"
             "• Санузел с душевой кабиной\n"
-            "• Деревянная веранда для отдыха\n"
-            "🏊‍♂️ <i>Бассейн включен в стоимость проживания бесплатно!</i>"
+            "• Большая деревянная терраса"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/f8d/600_400_1/f8dbb24b89ebc90539fbeceae47c87c9.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1000&q=80",
     },
     "std_brick_3p": {
         "title": "СТАНДАРТ кирпичный домик 3-х местный",
         "max_guests": 3,
         "price_per_night": 3500,
+        "folder": "images/std_brick_3p",
         "description": (
             "🏡 <b>СТАНДАРТ кирпичный домик 3-х местный</b>\n\n"
-            "Капитальный прохладный домик для комфортного отдыха 3 гостей.\n\n"
+            "Капитальный прохладный домик для комфортного отдыха 3 человек.\n\n"
             "<b>В домике:</b>\n"
             "• 3 комфортных спальных места\n"
             "• Сплит-система, холодильник, ТВ\n"
-            "• Санузел с душем\n"
-            "• Индивидуальная веранда перед домиком"
+            "• Собственный санузел с душем\n"
+            "• Индивидуальная веранда перед входом"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/b3b/600_400_1/b3b8dfa2e6fca78e1189c4908051a8eb.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=1000&q=80",
     },
     "std_wood_2p": {
         "title": "СТАНДАРТ Деревянный домик 2-х местный",
         "max_guests": 2,
         "price_per_night": 2800,
+        "folder": "images/std_wood_2p",
         "description": (
             "🏡 <b>СТАНДАРТ Деревянный домик 2-х местный</b>\n\n"
-            "Уютный деревянный домик для двоих в тени лаванды и роз.\n\n"
+            "Уютный деревянный домик для двоих в тишине и зелени.\n\n"
             "<b>В домике:</b>\n"
-            "• 2 спальных места\n"
+            "• 2 спальных места (двуспальная или раздельные кровати)\n"
             "• Кондиционер, холодильник, ТВ\n"
             "• Санузел с душем\n"
             "• Открытая терраса со столиком"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/a9f/600_400_1/a9fc2ce6fe7a77b81b8979c3f0b2fcf7.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80",
     },
     "std_2p": {
-        "title": "СТАНДАРТ 2-х местный + доп.место",
-        "max_guests": 3,
-        "price_per_night": 3200,
+        "title": "СТАНДАРТ 2-х местный",
+        "max_guests": 2,
+        "price_per_night": 3000,
+        "folder": "images/std_2p",
         "description": (
-            "🏡 <b>СТАНДАРТ 2-х местный + доп.место</b>\n\n"
-            "Классический светлый номер стандарт.\n\n"
+            "🏡 <b>СТАНДАРТ 2-х местный</b>\n\n"
+            "Классический уютный номер для 2 гостей.\n\n"
             "<b>В номере:</b>\n"
-            "• Двуспальная кровать + доп. место\n"
+            "• Двуспальная кровать\n"
             "• Сплит-система, ТВ, холодильник, чайник\n"
             "• Санузел и душевая\n"
+            "• Зона отдыха"
+        ),
+    },
+    "std_2p_extra": {
+        "title": "СТАНДАРТ 2-х местный + доп.место",
+        "max_guests": 3,
+        "price_per_night": 3300,
+        "folder": "images/std_2p_extra",
+        "description": (
+            "🏡 <b>СТАНДАРТ 2-х местный + доп.место</b>\n\n"
+            "Номер с возможностью комфортного размещения до 3 человек.\n\n"
+            "<b>В номере:</b>\n"
+            "• Двуспальная кровать + доп. место\n"
+            "• Сплит-система, телевизор, холодильник, чайник\n"
+            "• Санузел с душем\n"
             "• Терраса для отдыха"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/17a/600_400_1/17ae86be4efb702ec8c6cceee69a8bfe.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80",
     },
     "std_3p": {
-        "title": "СТАНДАРТ 3-х местный + доп.место",
-        "max_guests": 4,
-        "price_per_night": 3800,
+        "title": "СТАНДАРТ 3-х местный",
+        "max_guests": 3,
+        "price_per_night": 3700,
+        "folder": "images/std_3p",
         "description": (
-            "🏡 <b>СТАНДАРТ 3-х местный + доп.место</b>\n\n"
-            "Удобный номер для семьи из 3-4 человек.\n\n"
+            "🏡 <b>СТАНДАРТ 3-х местный</b>\n\n"
+            "Просторный 3-местный номер стандартной категории.\n\n"
             "<b>В номере:</b>\n"
-            "• 3 основных спальных места + евро-раскладушка\n"
-            "• Кондиционер, холодильник, ТВ\n"
+            "• 3 основных спальных места\n"
+            "• Кондиционер, холодильник, телевизор\n"
             "• Санузел с душем\n"
-            "• Веранда для вечернего чаепития"
+            "• Веранда для вечернего отдыха"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/28a/600_400_1/28a47eb38cbf917c093498877bc9ec7e.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=1000&q=80",
     },
     "std_4p": {
         "title": "СТАНДАРТ 4-х местный + доп.место",
         "max_guests": 5,
         "price_per_night": 4600,
+        "folder": "images/std_4p",
         "description": (
             "🏡 <b>СТАНДАРТ 4-х местный + доп.место</b>\n\n"
-            "Просторный семейный номер на 4-5 человек.\n\n"
+            "Семейный просторный номер на 4–5 гостей.\n\n"
             "<b>В номере:</b>\n"
-            "• 4 основных спальных места + 1 доп. место\n"
+            "• Спальные места: 4 основных + 1 доп. место\n"
             "• Сплит-система, холодильник, ТВ, чайник\n"
             "• Санузел с душем\n"
             "• Собственная летняя веранда"
         ),
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/39b/600_400_1/39ba579fcbb6ae083d987d605177265a.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1000&q=80",
     },
 }
 
 # =====================================================================
-# ФУНКЦИЯ ЗАГРУЗКИ ФОТОГРАФИЙ (ОБХОД БЛОКИРОВКИ ХОТЛИНКА)
+# ФУНКЦИЯ ОТПРАВКИ ФОТО АЛЬБОМАМИ ИЗ ПАПКИ
 # =====================================================================
-async def send_room_photo(message: Message, room: Dict[str, Any], caption: str, reply_markup: InlineKeyboardMarkup):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer": "https://rusalo4ka.com/",
-    }
-    try:
-        async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as session:
-            async with session.get(room["site_image_url"]) as response:
-                if response.status == 200:
-                    image_data = await response.read()
-                    file = BufferedInputFile(file=image_data, filename="room.jpg")
-                    await message.answer_photo(photo=file, caption=caption, reply_markup=reply_markup)
-                    return
-    except Exception as e:
-        logging.warning(f"Ошибка загрузки фото с сайта rusalo4ka.com: {e}")
+async def send_room_media(message: Message, folder_path: str, caption: str, reply_markup: InlineKeyboardMarkup):
+    images_list = []
+    
+    if os.path.exists(folder_path) and os.path.isdir(folder_path):
+        files = sorted(os.listdir(folder_path))
+        for f in files:
+            if f.lower().endswith(VALID_IMG_EXTENSIONS):
+                images_list.append(os.path.join(folder_path, f))
 
-    try:
-        await message.answer_photo(photo=room.get("fallback_image_url"), caption=caption, reply_markup=reply_markup)
-    except Exception:
+    # Если в папке несколько фото — отправляем альбом
+    if len(images_list) > 1:
+        media_group = []
+        for idx, img_path in enumerate(images_list[:10]):
+            if idx == 0:
+                media_group.append(InputMediaPhoto(media=FSInputFile(img_path), caption=caption))
+            else:
+                media_group.append(InputMediaPhoto(media=FSInputFile(img_path)))
+        
+        await message.answer_media_group(media=media_group)
+        await message.answer("Управление категорией:", reply_markup=reply_markup)
+
+    # Если одно фото
+    elif len(images_list) == 1:
+        await message.answer_photo(
+            photo=FSInputFile(images_list[0]),
+            caption=caption,
+            reply_markup=reply_markup
+        )
+    # Если папка пуста или еще не загружена
+    else:
         await message.answer(text=caption, reply_markup=reply_markup)
 
 def parse_dates(text: str) -> Tuple[bool, int, str, str, str]:
@@ -244,14 +260,14 @@ def parse_dates(text: str) -> Tuple[bool, int, str, str, str]:
 # 2. FSM (МАШИНА СОСТОЯНИЙ)
 # =====================================================================
 class BookingFlow(StatesGroup):
-    waiting_dates = State()
-    choosing_room = State()
-    waiting_guests = State()
-    confirm_price = State()
-    waiting_fullname = State()
-    waiting_phone = State()
-    waiting_email = State()
-    waiting_notes = State()
+    waiting_dates = State()        # Шаг 1: ввод дат
+    choosing_room = State()        # Шаг 2: выбор категории
+    waiting_guests = State()       # Шаг 3: выбор гостей
+    confirm_price = State()        # Шаг 4: расчет (30% предоплата), Оплатить / Отменить
+    waiting_fullname = State()     # Шаг 5: Имя и Фамилия
+    waiting_phone = State()        # Шаг 6: Телефон
+    waiting_email = State()        # Шаг 7: E-mail
+    waiting_notes = State()        # Шаг 8: Примечания
 
 # =====================================================================
 # 3. КЛАВИАТУРЫ
@@ -259,9 +275,9 @@ class BookingFlow(StatesGroup):
 def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton(text="🏡 Наши номера"), KeyboardButton(text="📝 Забронировать")],
-        [KeyboardButton(text="🏊‍♂️ Бассейн"), KeyboardButton(text="🌴 О базе")],
-        [KeyboardButton(text="🎡 Инфраструктура и услуги"), KeyboardButton(text="⭐ Отзывы")],
-        [KeyboardButton(text="❓ Вопросы и ответы (FAQ)"), KeyboardButton(text="📞 Контакты и локация")],
+        [KeyboardButton(text="🌴 О базе"), KeyboardButton(text="🎡 Инфраструктура и услуги")],
+        [KeyboardButton(text="⭐ Отзывы"), KeyboardButton(text="❓ Вопросы и ответы (FAQ)")],
+        [KeyboardButton(text="📞 Контакты и локация")],
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
@@ -298,7 +314,7 @@ def get_single_room_keyboard(room_key: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🛎 Забронировать этот номер", callback_data=f"book_room_target:{room_key}")],
-            [InlineKeyboardButton(text="⬅️ Назад к списку категорий", callback_data="back_to_rooms_catalog")]
+            [InlineKeyboardButton(text="⬅️ Назад к категориям", callback_data="back_to_rooms_catalog")]
         ]
     )
 
@@ -328,7 +344,7 @@ def get_payment_decision_keyboard() -> InlineKeyboardMarkup:
     )
 
 # =====================================================================
-# 4. ОБРАБОТЧИКИ МЕНЮ
+# 4. ОБРАБОТЧИКИ
 # =====================================================================
 router = Router()
 
@@ -337,11 +353,11 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     text = (
         "<b>Добро пожаловать в базу отдыха «Русалочка»! 🌊</b>\n\n"
-        "Семейный отдых на песчаном побережье в станице Благовещенская (Анапа).\n"
-        "Большой бассейн с морской водой, уютные эко-домики и номера с оборудованной кухней!\n\n"
-        "📅 <b>Период работы базы: с 15 июня по 15 сентября</b>\n"
+        "Семейный отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
+        "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
+        "📅 <b>Период работы: с 15 июня по 15 сентября</b>\n"
         "🕒 <b>Заезд — с 13:00 | Выезд — до 11:00</b>\n\n"
-        "Выберите нужный раздел в меню ниже ⬇"
+        "Выберите нужный раздел в меню ниже ⬇️️"
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
@@ -363,7 +379,7 @@ async def show_rooms(message: Message):
     text = (
         "<b>🏡 Категории номеров базы отдыха «Русалочка»:</b>\n\n"
         "Нажмите на интересующую категорию, чтобы посмотреть реальные фотографии, "
-        "комплектацию и условия:"
+        "комплектацию и условия проживания:"
     )
     await message.answer(text, reply_markup=get_rooms_list_keyboard())
 
@@ -391,9 +407,9 @@ async def view_single_room(callback: CallbackQuery):
         f"👥 <b>Вместимость:</b> до {room['max_guests']} человек\n"
         f"💰 <b>Стоимость:</b> от {room['price_per_night']} ₽ / сутки"
     )
-    await send_room_photo(
+    await send_room_media(
         message=callback.message,
-        room=room,
+        folder_path=room.get("folder", ""),
         caption=caption,
         reply_markup=get_single_room_keyboard(room_key)
     )
@@ -412,30 +428,6 @@ async def show_reviews(message: Message):
         "на официальной странице базы на Яндекс.Картах:",
         reply_markup=kb
     )
-
-# --- БАССЕЙН ---
-@router.message(F.text == "🏊‍♂️ Бассейн")
-async def show_pool(message: Message):
-    caption = (
-        "<b>🏊‍♂ Самый большой бассейн в округе!</b>\n"
-        "<i>Кристально чистая морская вода, безопасная зона для малышей и комфортные шезлонги для загара.</i>\n\n"
-        "<b>Абонементы на посещение:</b>\n"
-        "✅ <b>Для гостей, проживающих в номерах категории «Эко Домик» и «Номер с кухней (апарт.)», пользование бассейном:</b>\n"
-        "👉 <b>БЕСПЛАТНО</b>\n\n"
-        "Остальные гости могут приобрести доступ к бассейну за дополнительную плату в администрации:\n\n"
-        "• <b>1 час:</b> Взрослый/Детский (с 4 лет) — <b>180 ₽</b> | Дети (до 4 лет) — <b>Бесплатно</b>\n"
-        "• <b>1 день:</b> Взрослый/Детский (с 4 лет) — <b>550 ₽</b> | Дети (до 4 лет) — <b>Бесплатно</b>\n"
-        "• <b>5 дней:</b> Взрослый/Детский (с 4 лет) — <b>1 950 ₽</b> | Дети (до 4 лет) — <b>Бесплатно</b>\n\n"
-        "⚠️ <i>Дети до 14 лет могут посещать бассейн только в сопровождении взрослых.</i>"
-    )
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🛎 Забронировать отдых", callback_data="start_booking_fsm")]]
-    )
-    pool_stub = {
-        "site_image_url": "https://rusalo4ka.com/upload/resize_cache/iblock/785/800_600_1/7858c9735d6e066a33c2a3e5c942488a.jpg",
-        "fallback_image_url": "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&w=1000&q=80"
-    }
-    await send_room_photo(message=message, room=pool_stub, caption=caption, reply_markup=kb)
 
 # --- ИНФРАСТРУКТУРА ---
 @router.message(F.text == "🎡 Инфраструктура и услуги")
@@ -470,9 +462,9 @@ async def show_about(message: Message):
         "<b>🌴 Семейная база отдыха «Русалочка»</b>\n\n"
         "«Рай для ваших детей и спокойный отдых для родителей!»\n"
         "Пока взрослые расслабляются, детям всегда есть чем заняться.\n\n"
-        "• Закрытая зеленая территория\n"
-        "• Шаговая доступность к просторному пляжу и морю\n"
-        "• Открытый бассейн, детский городок и анимация\n"
+        "• Закрытая охраняемая зеленая территория\n"
+        "• Шаговая доступность к просторному пляжу и теплому морю\n"
+        "• Детский игровой комплекс, анимация и уютная атмосфера\n"
         "• Период работы: <b>с 15 июня по 15 сентября</b>\n"
         "• Официальный сайт: https://rusalo4ka.com/"
     )
@@ -556,10 +548,9 @@ async def faq_back_root(callback: CallbackQuery):
 # 5. ПОШАГОВЫЙ СЦЕНАРИЙ БРОНИРОВАНИЯ
 # =====================================================================
 
-# 1. ЗАПРОС ДАТ
+# 1. ЗАПРОС ДАТ (СНАЧАЛА ДАТЫ)
 @router.message(F.text == "📝 Забронировать")
-@router.callback_query(F.data == "start_booking_fsm")
-async def fsm_step1_dates(event: Message | CallbackQuery, state: FSMContext):
+async def fsm_step1_dates(message: Message, state: FSMContext):
     await state.clear()
     prompt = (
         "📅 <b>Шаг 1 из 5: Выберите даты заезда и выезда</b>\n\n"
@@ -568,12 +559,7 @@ async def fsm_step1_dates(event: Message | CallbackQuery, state: FSMContext):
         "Введите желаемые даты в формате: <b>ДД.ММ - ДД.ММ</b>\n"
         "<i>Например: 20.06 - 30.06 или 01.07 - 10.07</i>"
     )
-    if isinstance(event, CallbackQuery):
-        await event.message.answer(prompt, reply_markup=get_cancel_reply_keyboard())
-        await event.answer()
-    else:
-        await event.answer(prompt, reply_markup=get_cancel_reply_keyboard())
-
+    await message.answer(prompt, reply_markup=get_cancel_reply_keyboard())
     await state.set_state(BookingFlow.waiting_dates)
 
 @router.callback_query(F.data.startswith("book_room_target:"))
@@ -643,7 +629,7 @@ async def fsm_step2_process_dates(message: Message, state: FSMContext):
         )
         await state.set_state(BookingFlow.choosing_room)
 
-# ВЫБОР НОМЕРА ИЗ СПИСКА
+# ВЫБОР НОМЕРА
 @router.callback_query(BookingFlow.choosing_room, F.data.startswith("select_room_fsm:"))
 async def fsm_step3_select_room(callback: CallbackQuery, state: FSMContext):
     room_key = callback.data.split(":")[1]
@@ -672,7 +658,7 @@ async def fsm_step3_select_room(callback: CallbackQuery, state: FSMContext):
     await state.set_state(BookingFlow.waiting_guests)
     await callback.answer()
 
-# 3. ВЫБОР ГОСТЕЙ И РАСЧЕТ 30% ПРЕДОПЛАТЫ
+# 3. РАСЧЕТ СТОИМОСТИ (30% ПРЕДОПЛАТА)
 @router.callback_query(BookingFlow.waiting_guests, F.data.startswith("set_guests_fsm:"))
 async def fsm_step4_calc_summary(callback: CallbackQuery, state: FSMContext):
     guests_count = int(callback.data.split(":")[1])
@@ -753,7 +739,7 @@ async def fsm_step6_phone_received(message: Message, state: FSMContext):
 
     await message.answer(
         "✉️ <b>Укажите ваш E-mail:</b>\n"
-        "На него будет отправлен ваучер бронирования и электронный чек.\n"
+        "На него будет отправлен ваучер бронирования и чек.\n"
         "<i>(Или нажмите «Пропустить», если хотите получить подтверждение только в Telegram)</i>",
         reply_markup=get_skip_keyboard()
     )
@@ -775,7 +761,7 @@ async def fsm_step7_email_received(message: Message, state: FSMContext):
     )
     await state.set_state(BookingFlow.waiting_notes)
 
-# 8. ФИНИШ: ПРИМЕЧАНИЯ, ПОДТВЕРЖДЕНИЕ И КАРТОЧКА АДМИНУ
+# 8. ФИНИШ
 @router.message(BookingFlow.waiting_notes, F.text)
 async def fsm_step8_finish(message: Message, state: FSMContext, bot: Bot):
     notes = message.text.strip()
@@ -797,7 +783,7 @@ async def fsm_step8_finish(message: Message, state: FSMContext, bot: Bot):
 
     order_id = datetime.now().strftime("%d%m-%H%M")
 
-    # Сообщение клиенту
+    # Ответ клиенту
     client_response = (
         f"🎉 <b>Спасибо, {fullname}! Заявка №{order_id} оформлена!</b>\n\n"
         "📋 <b>Ваш расчет бронирования:</b>\n"
