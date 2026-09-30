@@ -1,4 +1,5 @@
 import os
+import re
 import asyncio
 import logging
 from typing import Dict, Any
@@ -345,21 +346,21 @@ async def process_feedback_question(message: Message, state: FSMContext, bot: Bo
     user_name = message.from_user.full_name
     username = f"@{message.from_user.username}" if message.from_user.username else "нет @username"
 
-    # Сообщение гостю
+    # Ответ клиенту
     await message.answer(
         "✅ <b>Ваш вопрос передан администраторам базы отдыха «Русалочка»!</b>\n\n"
         "Мы ответим вам прямо сюда в ближайшее время.",
         reply_markup=get_main_menu_keyboard()
     )
 
-    # Уведомление в админ-чат с системной меткой #USER_ID для ответа
+    # Уведомление в админ-чат с валидным тегом для извлечения ID
     admin_ticket = (
         f"📩 <b>НОВЫЙ ВОПРОС ОТ ГОСТЯ</b>\n"
         f"👤 <b>Гость:</b> {user_name} ({username})\n"
         f"🆔 <b>ID:</b> <code>{user_id}</code>\n\n"
         f"💬 <b>Вопрос:</b>\n<i>{user_question}</i>\n\n"
         f"👉 <i>Чтобы ответить гостю, просто нажмите «Ответить» (Reply) на это сообщение.</i>\n"
-        f"<!-- user_id:{user_id} -->"
+        f"<a href=\"tg://user?id={user_id}\">#user_{user_id}</a>"
     )
 
     if ADMIN_CHAT_ID:
@@ -375,10 +376,11 @@ async def process_feedback_question(message: Message, state: FSMContext, bot: Bo
 async def reply_from_admin(message: Message, bot: Bot):
     reply_text = message.reply_to_message.text or message.reply_to_message.caption or ""
     
-    # Ищем скрытый маркер user_id в тексте исходного сообщения
-    if "user_id:" in reply_text:
+    # Ищем #user_123456789 в сообщении, на которое сделан Reply
+    match = re.search(r"#user_(\d+)", reply_text)
+    if match:
         try:
-            target_user_id = int(reply_text.split("user_id:")[1].split(" ")[0].replace("-->", "").strip())
+            target_user_id = int(match.group(1))
             
             client_msg = (
                 "<b>💬 Ответ от администрации базы отдыха «Русалочка»:</b>\n\n"
@@ -439,7 +441,7 @@ async def show_booking_info(message: Message):
         "• <b>Предоплата для брони:</b> 30.00% от стоимости\n"
         "• <b>Остаток:</b> оплачивается при заселении\n"
         "• <b>Бесплатная отмена:</b> возможна за 14 дней до заезда\n\n"
-        "Нажмите кнопку ниже, чтобы перейти к выбору дат и категории ⬇️"
+        "Нажмите кнопку ниже, чтобы перейти к выбору дат и категории ⬇️️"
     )
     await message.answer(text, reply_markup=get_booking_page_keyboard())
 
@@ -467,7 +469,7 @@ async def show_infra(message: Message):
         "⚽ <b>Спортивный инвентарь</b>\n"
         "Мячи, ракетки, настольный теннис, шахматы, шашки и настольный футбол — всё для активного отдыха.\n\n"
         "🥩 <b>Мангальная зона</b>\n"
-        "Оборудованная зона отдыха с бесплатным предоставлением решеток, шампуров.\n\n"
+        "Оборудованная зона отдыха с бесплатным предоставлением решеток, шампуров, печи и казана (12 л).\n\n"
         "🌸 <b>Зеленая зона</b>\n"
         "Зеленая территория: 350 кустов роз и 1100 кустов лаванды.\n\n"
         "------------------------------------\n\n"
