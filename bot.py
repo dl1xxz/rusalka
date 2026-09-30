@@ -29,7 +29,7 @@ from aiogram.client.default import DefaultBotProperties
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8698519060:AAFMCj3zZHAjxrANyC4al0pM-TAblht-s_M")
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5014057300"))
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "-1003856852266"))
 
 # Ссылки проекта
 BOOKING_URL = "https://reservationsteps.ru/rooms/index/8dc26407-5b2f-46e5-8597-ebfc46cf8111?dfrom=15-06-2027&dto=20-06-2027&adults=2&lang=ru"
