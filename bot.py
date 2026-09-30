@@ -17,6 +17,8 @@ from aiogram.types import (
     InputMediaPhoto,
 )
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
@@ -32,8 +34,7 @@ ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "5014057300"))
 # Ссылки проекта
 BOOKING_URL = "https://reservationsteps.ru/rooms/index/8dc26407-5b2f-46e5-8597-ebfc46cf8111?dfrom=15-06-2027&dto=20-06-2027&adults=2&lang=ru"
 REVIEWS_URL = "https://yandex.ru/maps/org/rusalochka/241387417775/reviews/?ll=37.156738%2C45.028213&z=11.94"
-SUPPORT_BOT_URL = "https://t.me/rusalochka1_bot"
-SITE_RULES_URL = "https://rusalo4ka.com/"
+PDF_RULES_PATH = "rules.pdf"
 
 GEO_LATITUDE = 45.053805
 GEO_LONGITUDE = 37.086375
@@ -198,6 +199,12 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
 }
 
 # =====================================================================
+# FSM ДЛЯ ОБРАТНОЙ СВЯЗИ
+# =====================================================================
+class FeedbackState(StatesGroup):
+    waiting_for_question = State()
+
+# =====================================================================
 # ФУНКЦИЯ ОТПРАВКИ ФОТО АЛЬБОМАМИ ИЗ ПАПКИ
 # =====================================================================
 async def send_room_media(message: Message, folder_path: str, caption: str, reply_markup: InlineKeyboardMarkup):
@@ -241,6 +248,12 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
+def get_cancel_feedback_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="❌ Отменить вопрос")]],
+        resize_keyboard=True
+    )
+
 def get_rooms_list_keyboard() -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text=f"🏡 {data['title']}", callback_data=f"view_room:{key}")]
@@ -260,7 +273,7 @@ def get_booking_page_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="💳 Перейти к бронированию и оплате", url=BOOKING_URL)],
-            [InlineKeyboardButton(text="💬 Задать вопрос менеджеру", url=SUPPORT_BOT_URL)]
+            [InlineKeyboardButton(text="💬 Задать вопрос администратору", callback_data="start_feedback_fsm")]
         ]
     )
 
@@ -272,14 +285,16 @@ def get_faq_inline_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="При бронировании нужно вносить предоплату?", callback_data="faq:prepayment")],
             [InlineKeyboardButton(text="Предоплата возвратная?", callback_data="faq:refund")],
             [InlineKeyboardButton(text="Возможно размещение с животными?", callback_data="faq:pets")],
-            [InlineKeyboardButton(text="💬 Не нашли ответ? Написать нам", url=SUPPORT_BOT_URL)],
+            [InlineKeyboardButton(text="📄 Посмотреть полные правила (PDF)", callback_data="faq:pdf_rules")],
+            [InlineKeyboardButton(text="💬 Не нашли ответ? Написать нам", callback_data="start_feedback_fsm")],
         ]
     )
 
 def get_contacts_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="💬 Написать в службу поддержки", url=SUPPORT_BOT_URL)],
+            [InlineKeyboardButton(text="💬 Задать вопрос в боте", callback_data="start_feedback_fsm")],
+            [InlineKeyboardButton(text="📄 Правила проживания (PDF)", callback_data="faq:pdf_rules")],
             [InlineKeyboardButton(text="🌐 Открыть сайт rusalo4ka.com", url="https://rusalo4ka.com/")]
         ]
     )
@@ -290,7 +305,8 @@ def get_contacts_keyboard() -> InlineKeyboardMarkup:
 router = Router()
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
     text = (
         "<b>Добро пожаловать в базу отдыха «Русалочка»! 🌊</b>\n\n"
         "Отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
@@ -301,20 +317,77 @@ async def cmd_start(message: Message):
     )
     await message.answer(text, reply_markup=get_main_menu_keyboard())
 
-# --- КНОПКА ПОДДЕРЖКИ В МЕНЮ ---
+# --- ОБРАБОТКА СИСТЕМЫ ВОПРОСОВ (ИНТЕГРАЦИЯ С ЧАТОМ АДМИНИСТРАТОРОВ) ---
+@router.message(F.text == "❌ Отменить вопрос")
+async def cancel_feedback(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("Отправка вопроса отменена.", reply_markup=get_main_menu_keyboard())
+
 @router.message(F.text.in_(["💬 Остались вопросы? Напишите нам", "💬 Задать вопрос"]))
-async def ask_question_menu(message: Message):
+@router.callback_query(F.data == "start_feedback_fsm")
+async def start_feedback(event: Message | CallbackQuery, state: FSMContext):
+    await state.clear()
     text = (
-        "<b>💬 Есть вопросы по отдыху или бронированию?</b>\n\n"
-        "Вы можете напрямую задать любой вопрос нашей службе поддержки.\n"
-        "Нажмите кнопку ниже для перехода в чат ⬇️"
+        "<b>💬 Задать вопрос администратору базы отдыха</b>\n\n"
+        "Напишите ваш вопрос следующим сообщением. Мы получим его и ответим вам прямо в этот чат!"
     )
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💬 Написать в чат поддержки", url=SUPPORT_BOT_URL)]
-        ]
+    if isinstance(event, CallbackQuery):
+        await event.message.answer(text, reply_markup=get_cancel_feedback_keyboard())
+        await event.answer()
+    else:
+        await event.answer(text, reply_markup=get_cancel_feedback_keyboard())
+    await state.set_state(FeedbackState.waiting_for_question)
+
+@router.message(FeedbackState.waiting_for_question, F.text)
+async def process_feedback_question(message: Message, state: FSMContext, bot: Bot):
+    user_question = message.text.strip()
+    user_id = message.from_user.id
+    user_name = message.from_user.full_name
+    username = f"@{message.from_user.username}" if message.from_user.username else "нет @username"
+
+    # Сообщение гостю
+    await message.answer(
+        "✅ <b>Ваш вопрос передан администраторам базы отдыха «Русалочка»!</b>\n\n"
+        "Мы ответим вам прямо сюда в ближайшее время.",
+        reply_markup=get_main_menu_keyboard()
     )
-    await message.answer(text, reply_markup=kb)
+
+    # Уведомление в админ-чат с системной меткой #USER_ID для ответа
+    admin_ticket = (
+        f"📩 <b>НОВЫЙ ВОПРОС ОТ ГОСТЯ</b>\n"
+        f"👤 <b>Гость:</b> {user_name} ({username})\n"
+        f"🆔 <b>ID:</b> <code>{user_id}</code>\n\n"
+        f"💬 <b>Вопрос:</b>\n<i>{user_question}</i>\n\n"
+        f"👉 <i>Чтобы ответить гостю, просто нажмите «Ответить» (Reply) на это сообщение.</i>\n"
+        f"<!-- user_id:{user_id} -->"
+    )
+
+    if ADMIN_CHAT_ID:
+        try:
+            await bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_ticket)
+        except Exception as e:
+            logging.error(f"Не удалось доставить вопрос в админ-чат: {e}")
+
+    await state.clear()
+
+# --- ОТВЕТ АДМИНИСТРАТОРА ИЗ ГРУППЫ (REPLY НА СООБЩЕНИЕ БОТА) ---
+@router.message(F.reply_to_message & (F.chat.id == ADMIN_CHAT_ID))
+async def reply_from_admin(message: Message, bot: Bot):
+    reply_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+    
+    # Ищем скрытый маркер user_id в тексте исходного сообщения
+    if "user_id:" in reply_text:
+        try:
+            target_user_id = int(reply_text.split("user_id:")[1].split(" ")[0].replace("-->", "").strip())
+            
+            client_msg = (
+                "<b>💬 Ответ от администрации базы отдыха «Русалочка»:</b>\n\n"
+                f"{message.text}"
+            )
+            await bot.send_message(chat_id=target_user_id, text=client_msg)
+            await message.reply("✅ Ответ успешно доставлен гостю!")
+        except Exception as e:
+            await message.reply(f"❌ Не удалось отправить ответ: {e}")
 
 # --- РАЗДЕЛ: НАШИ НОМЕРА ---
 @router.message(F.text == "🏡 Наши номера")
@@ -430,7 +503,6 @@ async def show_contacts(message: Message):
         "<b>📞 Контакты базы отдыха «Русалочка»:</b>\n\n"
         "📍 <b>Адрес:</b> Краснодарский край, г. Анапа, ст. Благовещенская, б/о «Русалочка»\n"
         "📞 <b>Отдел бронирования:</b> +7 (918) 47-74-366\n"
-        "💬 <b>Чат с ботом/менеджером:</b> @rusalochka1_bot\n"
         "✉️ <b>E-mail:</b> anaparusalochka@rambler.ru\n"
         "🌐 <b>Сайт:</b> https://rusalo4ka.com/\n\n"
         "📍 <i>Ниже отправлена геолокация для Яндекс.Карт и навигатора:</i>"
@@ -442,6 +514,21 @@ async def show_contacts(message: Message):
 @router.message(F.text == "❓ Вопросы и ответы (FAQ)")
 async def show_faq(message: Message):
     await message.answer("<b>Часто задаваемые вопросы</b>", reply_markup=get_faq_inline_keyboard())
+
+# ОТПРАВКА ОФИЦИАЛЬНОГО PDF-ФАЙЛА ПРАВИЛ
+@router.callback_query(F.data == "faq:pdf_rules")
+async def send_pdf_rules(callback: CallbackQuery):
+    if os.path.exists(PDF_RULES_PATH):
+        doc = FSInputFile(PDF_RULES_PATH, filename="Правила_проживания_Русалочка.pdf")
+        await callback.message.answer_document(
+            document=doc,
+            caption="📄 <b>Официальные правила проживания на базе отдыха «Русалочка» (PDF)</b>"
+        )
+    else:
+        await callback.message.answer(
+            "📄 Документ правил обновляется. Вы также можете ознакомиться с ними на нашем сайте: https://rusalo4ka.com/"
+        )
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("faq:"))
 async def faq_click(callback: CallbackQuery):
@@ -476,16 +563,16 @@ async def faq_click(callback: CallbackQuery):
 
     item = faq_data.get(action)
     if not item:
-        await callback.answer("Вопрос не найден", show_alert=True)
+        await callback.answer()
         return
 
     text = f"<b>{item['q']}</b>\n\n{item['a']}"
 
     buttons = []
     if action == "pets":
-        buttons.append([InlineKeyboardButton(text="Посмотреть полные правила", url=SITE_RULES_URL)])
+        buttons.append([InlineKeyboardButton(text="📄 Посмотреть полные правила (PDF)", callback_data="faq:pdf_rules")])
     
-    buttons.append([InlineKeyboardButton(text="💬 Задать другой вопрос", url=SUPPORT_BOT_URL)])
+    buttons.append([InlineKeyboardButton(text="💬 Задать вопрос администратору", callback_data="start_feedback_fsm")])
     buttons.append([InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="faq_back_root")])
 
     back_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
