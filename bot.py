@@ -29,7 +29,7 @@ from aiogram.client.default import DefaultBotProperties
 # =====================================================================
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8698519060:AAFMCj3zZHAjxrANyC4al0pM-TAblht-s_M")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8698519060:AAHu2u2QKSAvlO-cj-ev-DP27iRedaZXPlk")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "-1003856852266"))
 
 # Ссылки проекта
@@ -57,6 +57,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел с душевой кабиной\n"
             "• Индивидуальная веранда/балкон для отдыха\n\n"
             "👥 <b>Вместимость:</b> до 3 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 4 500 ₽ / сутки"
         ),
     },
@@ -73,6 +74,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Ванная комната с душем\n"
             "• Просторная веранда\n\n"
             "👥 <b>Вместимость:</b> до 4 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 5 500 ₽ / сутки"
         ),
     },
@@ -88,6 +90,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Собственный санузел с душем\n"
             "• Терраса со столом и стульями на свежем воздухе\n\n"
             "👥 <b>Вместимость:</b> до 3 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 4 000 ₽ / сутки"
         ),
     },
@@ -104,6 +107,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел с душевой кабиной\n"
             "• Большая деревянная терраса\n\n"
             "👥 <b>Вместимость:</b> до 4 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 6 000 ₽ / сутки"
         ),
     },
@@ -119,6 +123,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Собственный санузел с душем\n"
             "• Индивидуальная веранда перед входом\n\n"
             "👥 <b>Вместимость:</b> до 3 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 3 500 ₽ / сутки"
         ),
     },
@@ -134,6 +139,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел с душем\n"
             "• Открытая терраса со столиком\n\n"
             "👥 <b>Вместимость:</b> до 2 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 2 800 ₽ / сутки"
         ),
     },
@@ -149,6 +155,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел и душевая\n"
             "• Зона отдыха\n\n"
             "👥 <b>Вместимость:</b> до 2 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 3 000 ₽ / сутки"
         ),
     },
@@ -164,6 +171,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел с душем\n"
             "• Терраса для отдыха\n\n"
             "👥 <b>Вместимость:</b> до 3 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 3 300 ₽ / сутки"
         ),
     },
@@ -179,6 +187,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел с душем\n"
             "• Веранда для вечернего отдыха\n\n"
             "👥 <b>Вместимость:</b> до 3 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 3 700 ₽ / сутки"
         ),
     },
@@ -194,6 +203,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
             "• Санузел с душем\n"
             "• Собственная летняя веранда\n\n"
             "👥 <b>Вместимость:</b> до 5 человек\n"
+            "🍽 <b>с 3-х разовым комплексным питанием</b>\n"
             "💰 <b>Стоимость:</b> от 4 600 ₽ / сутки"
         ),
     },
@@ -346,14 +356,14 @@ async def process_feedback_question(message: Message, state: FSMContext, bot: Bo
     user_name = message.from_user.full_name
     username = f"@{message.from_user.username}" if message.from_user.username else "нет @username"
 
-    # Ответ клиенту
+    # Ответ клиенту в ЛС
     await message.answer(
         "✅ <b>Ваш вопрос передан администраторам базы отдыха «Русалочка»!</b>\n\n"
         "Мы ответим вам прямо сюда в ближайшее время.",
         reply_markup=get_main_menu_keyboard()
     )
 
-    # Уведомление в админ-чат с валидным тегом для извлечения ID
+    # Уведомление в админ-чат со ссылкой #user_ID
     admin_ticket = (
         f"📩 <b>НОВЫЙ ВОПРОС ОТ ГОСТЯ</b>\n"
         f"👤 <b>Гость:</b> {user_name} ({username})\n"
@@ -371,7 +381,7 @@ async def process_feedback_question(message: Message, state: FSMContext, bot: Bo
 
     await state.clear()
 
-# --- ОТВЕТ АДМИНИСТРАТОРА ИЗ ГРУППЫ (REPLY НА СООБЩЕНИЕ БОТА) ---
+# --- ОТВЕТ АДМИНИСТРАТОРА ИЗ СУПЕРГРУППЫ (REPLY НА СООБЩЕНИЕ БОТА) ---
 @router.message(F.reply_to_message & (F.chat.id == ADMIN_CHAT_ID))
 async def reply_from_admin(message: Message, bot: Bot):
     reply_text = message.reply_to_message.text or message.reply_to_message.caption or ""
@@ -441,7 +451,7 @@ async def show_booking_info(message: Message):
         "• <b>Предоплата для брони:</b> 30.00% от стоимости\n"
         "• <b>Остаток:</b> оплачивается при заселении\n"
         "• <b>Бесплатная отмена:</b> возможна за 14 дней до заезда\n\n"
-        "Нажмите кнопку ниже, чтобы перейти к выбору дат и категории ⬇️️"
+        "Нажмите кнопку ниже, чтобы перейти к выбору дат и категории ⬇"
     )
     await message.answer(text, reply_markup=get_booking_page_keyboard())
 
