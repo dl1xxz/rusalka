@@ -124,7 +124,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": (
             "🏡 <b>СТАНДАРТ Деревянный домик 2-х местный</b>\n\n"
             "Уютный деревянный домик для двоих в тишине и зелени.\n\n"
-            "В домике:\n"
+            "<b>В домике:</b>\n"
             "• 2 спальных места\n"
             "• Кондиционер, холодильник, ТВ\n"
             "• Санузел с душем\n"
@@ -256,12 +256,13 @@ def get_faq_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="Возможно размещение с животными?", callback_data="faq_pets")],
         [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")],
         [InlineKeyboardButton(text="💬 Задать свой вопрос", callback_data="menu_feedback")],
-        [InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
     ])
 
 # =====================================================================
 # 3. ИНИЦИАЛИЗАЦИЯ И ХЭНДЛЕРЫ
 # =====================================================================
+# Исправленная строка инициализации для aiogram >= 3.7.0
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -274,7 +275,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
         "📅 <b>Период работы:</b> с 11 июня по 15 сентября[cite: 17]\n"
         "🕒 <b>Заезд</b> — с 13:00 | <b>Выезд</b> — до 11:00\n\n"
-        "Выберите нужный раздел в меню ниже ⬇️️"
+        "Выберите нужный раздел в меню ниже ⬇️"
     )
     await message.answer(welcome_text, reply_markup=get_main_menu_kb())
 
@@ -390,7 +391,7 @@ async def cb_about(callback: types.CallbackQuery):
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🌐 rusalo4ka.com", url="https://rusalo4ka.com/"), InlineKeyboardButton(text="🌐 русалочка.рф", url="https://xn--80aaahx7adkc.xn--p1ai/")],
-        [InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
     ])
     await callback.message.edit_text(about_text, reply_markup=kb)
 
@@ -418,7 +419,7 @@ async def cb_contacts(callback: types.CallbackQuery):
         [InlineKeyboardButton(text="🧭 Маршрут в Яндекс Картах", url=YANDEX_ROUTE_URL)],
         [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")],
         [InlineKeyboardButton(text="💬 Задать вопрос в чате", callback_data="menu_feedback")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")]
     ])
     await callback.message.edit_text(contacts_text, reply_markup=kb)
 
