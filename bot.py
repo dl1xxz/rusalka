@@ -8,6 +8,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.default import DefaultBotProperties
 from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
@@ -107,7 +108,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": (
             "🏡 <b>СТАНДАРТ кирпичный домик 3-х местный</b>\n\n"
             "Капитальный прохладный домик для отдыха 3 человек.\n\n"
-            "<b>В домике:</b>\n"
+            "В домике:\n"
             "• 3 комфортных спальных места\n"
             "• Сплит-система, холодильник, ТВ\n"
             "• Собственный санузел с душем\n"
@@ -123,7 +124,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": (
             "🏡 <b>СТАНДАРТ Деревянный домик 2-х местный</b>\n\n"
             "Уютный деревянный домик для двоих в тишине и зелени.\n\n"
-            "<b>В домике:</b>\n"
+            "В домике:\n"
             "• 2 спальных места\n"
             "• Кондиционер, холодильник, ТВ\n"
             "• Санузел с душем\n"
@@ -200,7 +201,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
 }
 
 def get_room_photos(folder_name: str) -> List[str]:
-    """Сканирует папку images/<folder_name> и возвращает пути к 1.webp, 2.webp и т.д."""
+    """Сканирует папку images/<folder_name> и возвращает пути к файлам."""
     folder_path = os.path.join("images", folder_name)
     if not os.path.isdir(folder_path):
         return []
@@ -237,7 +238,7 @@ def get_rooms_list_kb() -> InlineKeyboardMarkup:
     buttons = []
     for key, data in ROOMS_CATALOG.items():
         buttons.append([InlineKeyboardButton(text=f"🏡 {data['title']}", callback_data=f"view_room_{key}")])
-    buttons.append([InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")])
+    buttons.append([InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_single_room_kb() -> InlineKeyboardMarkup:
@@ -255,13 +256,13 @@ def get_faq_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="Возможно размещение с животными?", callback_data="faq_pets")],
         [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")],
         [InlineKeyboardButton(text="💬 Задать свой вопрос", callback_data="menu_feedback")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")]
     ])
 
 # =====================================================================
 # 3. ИНИЦИАЛИЗАЦИЯ И ХЭНДЛЕРЫ
 # =====================================================================
-bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher(storage=MemoryStorage())
 
 @dp.message(CommandStart())
@@ -273,7 +274,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
         "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
         "📅 <b>Период работы:</b> с 11 июня по 15 сентября[cite: 17]\n"
         "🕒 <b>Заезд</b> — с 13:00 | <b>Выезд</b> — до 11:00\n\n"
-        "Выберите нужный раздел в меню ниже ⬇️"
+        "Выберите нужный раздел в меню ниже ⬇️️"
     )
     await message.answer(welcome_text, reply_markup=get_main_menu_kb())
 
@@ -315,14 +316,12 @@ async def cb_view_room(callback: types.CallbackQuery):
 
     photos = get_room_photos(room.get("folder", room_key))
 
-    # Удаляем предыдущее меню перед выводом карточки номера
     try:
         await callback.message.delete()
     except Exception:
         pass
 
     if photos:
-        # Отправляем фотографии альбомом (медиагруппой)
         media_group = []
         for idx, p_path in enumerate(photos):
             photo_file = FSInputFile(p_path)
@@ -391,7 +390,7 @@ async def cb_about(callback: types.CallbackQuery):
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🌐 rusalo4ka.com", url="https://rusalo4ka.com/"), InlineKeyboardButton(text="🌐 русалочка.рф", url="https://xn--80aaahx7adkc.xn--p1ai/")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")]
     ])
     await callback.message.edit_text(about_text, reply_markup=kb)
 
