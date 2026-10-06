@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 # =====================================================================
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8698519060:AAF4eSk6Su-lcWbTpY6mfkJtd1Nv-dP0WCg")
+BOT_TOKEN = "8698519060:AAF4eSk6Su-lcWbTpY6mfkJtd1Nv-dP0WCg".strip()
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "-79780607715530"))
 
 BOOKING_URL = "https://reservationsteps.ru/rooms/index/8dc26407-5b2f-46e5-8597-ebfc46cf8111?dfrom=11-06-2027&dto=20-06-2027&adults=2&lang=ru"
