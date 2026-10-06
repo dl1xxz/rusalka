@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any, List
 
 from aiogram import Bot, Dispatcher, F, types
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -26,41 +26,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ============================================================
 # ВАЖНО:
-# Токен НЕ хранится непосредственно в коде.
+# Токен НЕ хранится в коде.
+# Он берётся из переменной окружения BOT_TOKEN.
+# ============================================================
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
     raise RuntimeError(
-        "BOT_TOKEN не задан. "
+        "BOT_TOKEN не задан! "
         "Добавьте BOT_TOKEN в переменные окружения BotHost."
     )
 
-# ID чата администратора
-ADMIN_CHAT_ID = int(
-    os.getenv("ADMIN_CHAT_ID", "-79780607715530")
-)
+# ID чата администратора также можно хранить в переменной окружения.
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0"))
 
-# Версия для диагностики.
-# По ней можно определить, что запущен именно этот файл.
+# Версия для проверки, что запущен именно новый код.
 BOT_VERSION = "RUSALOCHKA_BOT_2026_10_06_V2"
 
-
-# =====================================================================
-# ССЫЛКИ
-# =====================================================================
 
 BOOKING_URL = (
     "https://reservationsteps.ru/rooms/index/"
     "8dc26407-5b2f-46e5-8597-ebfc46cf8111"
-    "?dfrom=11-06-2027&dto=20-06-2027"
-    "&adults=2&lang=ru"
+    "?dfrom=11-06-2027&dto=20-06-2027&adults=2&lang=ru"
 )
 
 REVIEWS_YANDEX_URL = (
-    "https://yandex.ru/maps/org/rusalochka/"
-    "241387417775/reviews/"
-    "?ll=37.156738%2C45.028213&z=11.94"
+    "https://yandex.ru/maps/org/rusalochka/241387417775/"
+    "reviews/?ll=37.156738%2C45.028213&z=11.94"
 )
 
 REVIEWS_2GIS_URL = (
@@ -68,8 +63,7 @@ REVIEWS_2GIS_URL = (
 )
 
 YANDEX_ROUTE_URL = (
-    "https://yandex.ru/maps/org/rusalochka/"
-    "241387417775"
+    "https://yandex.ru/maps/org/rusalochka/241387417775"
     "?si=5zprzpwhdg2vqk8wegq6b3krmr"
 )
 
@@ -78,7 +72,7 @@ OFERTA_FILE_PATH = "oferta.pdf"
 
 
 # =====================================================================
-# FSM
+# 2. СОСТОЯНИЯ
 # =====================================================================
 
 class SupportStates(StatesGroup):
@@ -86,7 +80,7 @@ class SupportStates(StatesGroup):
 
 
 # =====================================================================
-# 2. НОМЕРНОЙ ФОНД
+# 3. НОМЕРНОЙ ФОНД
 # =====================================================================
 
 ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
@@ -327,7 +321,7 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
 
 
 # =====================================================================
-# 3. РАБОТА С ФОТО
+# 4. ФОТОГРАФИИ
 # =====================================================================
 
 def get_room_photos(folder_name: str) -> List[str]:
@@ -342,7 +336,7 @@ def get_room_photos(folder_name: str) -> List[str]:
         ".webp",
         ".jpg",
         ".jpeg",
-        ".png",
+        ".png"
     )
 
     try:
@@ -354,18 +348,18 @@ def get_room_photos(folder_name: str) -> List[str]:
                     os.path.join(folder_path, filename)
                 )
 
-    except Exception as error:
+    except Exception as e:
         logging.error(
             "Ошибка чтения папки %s: %s",
             folder_path,
-            error
+            e
         )
 
     return photos
 
 
 # =====================================================================
-# 4. КЛАВИАТУРЫ
+# 5. КЛАВИАТУРЫ
 # =====================================================================
 
 def get_main_reply_kb() -> ReplyKeyboardMarkup:
@@ -373,26 +367,32 @@ def get_main_reply_kb() -> ReplyKeyboardMarkup:
         keyboard=[
             [
                 KeyboardButton(text="🏡 Наши номера"),
-                KeyboardButton(text="📝 Забронировать"),
+                KeyboardButton(text="📝 Забронировать")
             ],
             [
                 KeyboardButton(text="🌴 О базе"),
-                KeyboardButton(text="🎡 Инфраструктура и услуги"),
+                KeyboardButton(
+                    text="🎡 Инфраструктура и услуги"
+                )
             ],
             [
                 KeyboardButton(text="⭐ Отзывы"),
-                KeyboardButton(text="❓ Вопросы и ответы (FAQ)"),
+                KeyboardButton(
+                    text="❓ Вопросы и ответы (FAQ)"
+                )
             ],
             [
-                KeyboardButton(text="📞 Контакты и локация"),
+                KeyboardButton(
+                    text="📞 Контакты и локация"
+                )
             ],
             [
                 KeyboardButton(
                     text="💬 Остались вопросы? Напишите нам"
-                ),
-            ],
+                )
+            ]
         ],
-        resize_keyboard=True,
+        resize_keyboard=True
     )
 
 
@@ -405,7 +405,7 @@ def get_cancel_reply_kb() -> ReplyKeyboardMarkup:
                 )
             ]
         ],
-        resize_keyboard=True,
+        resize_keyboard=True
     )
 
 
@@ -417,7 +417,7 @@ def get_rooms_list_kb() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text=f"🏡 {data['title']}",
-                    callback_data=f"view_room_{key}",
+                    callback_data=f"view_room_{key}"
                 )
             ]
         )
@@ -433,15 +433,15 @@ def get_single_room_kb() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="🛎 Забронировать этот номер",
-                    url=BOOKING_URL,
+                    url=BOOKING_URL
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="⬅️ Назад к списку номеров",
-                    callback_data="menu_rooms_inline",
+                    callback_data="menu_rooms_inline"
                 )
-            ],
+            ]
         ]
     )
 
@@ -452,58 +452,58 @@ def get_faq_kb() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="Во сколько заселение?",
-                    callback_data="faq_checkin",
+                    callback_data="faq_checkin"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="Во сколько выселение из номера?",
-                    callback_data="faq_checkout",
+                    callback_data="faq_checkout"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="При бронировании нужно вносить предоплату?",
-                    callback_data="faq_prepayment",
+                    callback_data="faq_prepayment"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="Предоплата возвратная?",
-                    callback_data="faq_refund",
+                    callback_data="faq_refund"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="Возможно размещение с животными?",
-                    callback_data="faq_pets",
+                    callback_data="faq_pets"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📄 Правила проживания (PDF)",
-                    callback_data="send_rules_pdf",
+                    callback_data="send_rules_pdf"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📑 Договор оферты (PDF)",
-                    callback_data="send_oferta_pdf",
+                    callback_data="send_oferta_pdf"
                 )
-            ],
+            ]
         ]
     )
 
 
 # =====================================================================
-# 5. ИНИЦИАЛИЗАЦИЯ TELEGRAM
+# 6. ИНИЦИАЛИЗАЦИЯ BOT / DISPATCHER
 # =====================================================================
 
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(
         parse_mode="HTML"
-    ),
+    )
 )
 
 dp = Dispatcher(
@@ -512,7 +512,7 @@ dp = Dispatcher(
 
 
 # =====================================================================
-# 6. ПРИВЕТСТВИЕ
+# 7. ПРИВЕТСТВИЕ
 # =====================================================================
 
 WELCOME_MESSAGE = (
@@ -521,77 +521,80 @@ WELCOME_MESSAGE = (
     "(Анапа, ст. Благовещенская).\n"
     "Зеленая территория, уютные эко-домики "
     "и номера с оборудованной кухней!\n\n"
-    "📅 <b>Период работы:</b> с 11 июня по 15 сентября\n"
+
+    "📅 <b>Период работы:</b> "
+    "с 11 июня по 15 сентября\n"
+
     "🕒 <b>Заезд</b> — с 13:00 | "
     "<b>Выезд</b> — до 11:00\n\n"
+
     "Выберите нужный раздел в меню ниже ⬇️"
 )
 
 
 # =====================================================================
-# 7. /START
+# 8. START
 # =====================================================================
 
 @dp.message(CommandStart())
 async def cmd_start(
     message: types.Message,
-    state: FSMContext,
+    state: FSMContext
 ):
     await state.clear()
 
     await message.answer(
         WELCOME_MESSAGE,
-        reply_markup=get_main_reply_kb(),
+        reply_markup=get_main_reply_kb()
     )
 
 
 # =====================================================================
-# 8. НАШИ НОМЕРА
+# 9. НАШИ НОМЕРА
 # =====================================================================
 
 @dp.message(F.text == "🏡 Наши номера")
 async def msg_rooms(message: types.Message):
+
     text = (
-        "🏡 <b>Номерной фонд базы отдыха "
-        "«Русалочка»:</b>\n\n"
+        "🏡 <b>Номерной фонд базы отдыха «Русалочка»:</b>\n\n"
         "Выберите категорию для просмотра "
         "фотографий и описания:"
     )
 
     await message.answer(
         text,
-        reply_markup=get_rooms_list_kb(),
+        reply_markup=get_rooms_list_kb()
     )
 
 
 @dp.callback_query(F.data == "menu_rooms_inline")
 async def cb_rooms_inline(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
     text = (
-        "🏡 <b>Номерной фонд базы отдыха "
-        "«Русалочка»:</b>\n\n"
+        "🏡 <b>Номерной фонд базы отдыха «Русалочка»:</b>\n\n"
         "Выберите категорию для просмотра "
         "фотографий и описания:"
     )
 
     await callback.message.answer(
         text,
-        reply_markup=get_rooms_list_kb(),
+        reply_markup=get_rooms_list_kb()
     )
 
 
 @dp.callback_query(F.data.startswith("view_room_"))
 async def cb_view_room(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
     room_key = callback.data.replace(
         "view_room_",
-        "",
+        ""
     )
 
     room = ROOMS_CATALOG.get(room_key)
@@ -609,17 +612,21 @@ async def cb_view_room(
         pass
 
     if photos:
+
         media_group = []
 
-        for index, photo_path in enumerate(photos):
-            photo_file = FSInputFile(photo_path)
+        for idx, photo_path in enumerate(photos):
 
-            if index == 0:
+            photo_file = FSInputFile(
+                photo_path
+            )
+
+            if idx == 0:
                 media_group.append(
                     InputMediaPhoto(
                         media=photo_file,
                         caption=room["description"],
-                        parse_mode="HTML",
+                        parse_mode="HTML"
                     )
                 )
             else:
@@ -635,29 +642,31 @@ async def cb_view_room(
 
         await callback.message.answer(
             "Выберите действие:",
-            reply_markup=get_single_room_kb(),
+            reply_markup=get_single_room_kb()
         )
 
     else:
+
         await callback.message.answer(
             room["description"],
-            reply_markup=get_single_room_kb(),
+            reply_markup=get_single_room_kb()
         )
 
 
 # =====================================================================
-# 9. БРОНИРОВАНИЕ
+# 10. БРОНИРОВАНИЕ
 # =====================================================================
 
 @dp.message(F.text == "📝 Забронировать")
 async def msg_book(message: types.Message):
+
     book_info = (
         "📝 <b>Онлайн-бронирование номеров</b>\n\n"
 
         "В нашем официальном модуле вы можете "
         "в реальном времени выбрать удобные даты, "
-        "проверить наличие свободных мест "
-        "и мгновенно забронировать проживание!\n\n"
+        "проверить наличие свободных мест и "
+        "мгновенно забронировать проживание!\n\n"
 
         "📌 <b>Условия бронирования:</b>\n"
         "• Период работы: с 11 июня по 15 сентября\n"
@@ -671,7 +680,7 @@ async def msg_book(message: types.Message):
             [
                 InlineKeyboardButton(
                     text="💳 Перейти к бронированию и оплате",
-                    url=BOOKING_URL,
+                    url=BOOKING_URL
                 )
             ]
         ]
@@ -679,16 +688,17 @@ async def msg_book(message: types.Message):
 
     await message.answer(
         book_info,
-        reply_markup=kb,
+        reply_markup=kb
     )
 
 
 # =====================================================================
-# 10. ИНФРАСТРУКТУРА
+# 11. ИНФРАСТРУКТУРА
 # =====================================================================
 
 @dp.message(F.text == "🎡 Инфраструктура и услуги")
 async def msg_infra(message: types.Message):
+
     infra_text = (
         "🎡 <b>ИНФРАСТРУКТУРА И УСЛУГИ</b>\n\n"
 
@@ -714,15 +724,18 @@ async def msg_infra(message: types.Message):
         "для гостей базы отдыха — круглосуточно"
     )
 
-    await message.answer(infra_text)
+    await message.answer(
+        infra_text
+    )
 
 
 # =====================================================================
-# 11. О БАЗЕ
+# 12. О БАЗЕ
 # =====================================================================
 
 @dp.message(F.text == "🌴 О базе")
 async def msg_about(message: types.Message):
+
     about_text = (
         "🌴 <b>База отдыха «Русалочка»</b>\n\n"
 
@@ -742,64 +755,66 @@ async def msg_about(message: types.Message):
             [
                 InlineKeyboardButton(
                     text="🌐 rusalo4ka.com",
-                    url="https://rusalo4ka.com/",
+                    url="https://rusalo4ka.com/"
                 ),
                 InlineKeyboardButton(
                     text="🌐 русалочка.рф",
-                    url="https://xn--80aaahx7adkc.xn--p1ai/",
-                ),
+                    url="https://xn--80aaahx7adkc.xn--p1ai/"
+                )
             ]
         ]
     )
 
     await message.answer(
         about_text,
-        reply_markup=kb,
+        reply_markup=kb
     )
 
 
 # =====================================================================
-# 12. ОТЗЫВЫ
+# 13. ОТЗЫВЫ
 # =====================================================================
 
 @dp.message(F.text == "⭐ Отзывы")
 async def msg_reviews(message: types.Message):
+
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text="⭐ Отзывы на Яндекс.Картах",
-                    url=REVIEWS_YANDEX_URL,
+                    url=REVIEWS_YANDEX_URL
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🗺️ Отзывы в 2ГИС",
-                    url=REVIEWS_2GIS_URL,
+                    url=REVIEWS_2GIS_URL
                 )
-            ],
+            ]
         ]
     )
 
     await message.answer(
         "⭐ Отзывы наших гостей на онлайн-картах:",
-        reply_markup=kb,
+        reply_markup=kb
     )
 
 
 # =====================================================================
-# 13. КОНТАКТЫ И ЛОКАЦИЯ
+# 14. КОНТАКТЫ
 # =====================================================================
 
 @dp.message(F.text == "📞 Контакты и локация")
 async def msg_contacts(message: types.Message):
+
     contacts_text = (
         "📞 <b>Контакты базы отдыха «Русалочка»:</b>\n\n"
 
-        "📍 <b>Адрес:</b> Краснодарский край, "
-        "г. Анапа, ст. Благовещенская, "
-        "ул. Прибрежная, д. 13, "
-        "б/о «Русалочка»\n"
+        "📍 <b>Адрес:</b> "
+        "Краснодарский край, г. Анапа, "
+        "ст. Благовещенская, ул. Прибрежная, "
+        "д. 13, б/о «Русалочка»\n"
 
         "📞 <b>Отдел бронирования:</b> "
         "+7 (918) 47-74-366\n"
@@ -817,44 +832,45 @@ async def msg_contacts(message: types.Message):
             [
                 InlineKeyboardButton(
                     text="🧭 Маршрут в Яндекс Картах",
-                    url=YANDEX_ROUTE_URL,
+                    url=YANDEX_ROUTE_URL
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📄 Правила проживания (PDF)",
-                    callback_data="send_rules_pdf",
+                    callback_data="send_rules_pdf"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📑 Договор оферты (PDF)",
-                    callback_data="send_oferta_pdf",
+                    callback_data="send_oferta_pdf"
                 )
-            ],
+            ]
         ]
     )
 
     await message.answer(
         contacts_text,
-        reply_markup=kb,
+        reply_markup=kb
     )
 
 
 # =====================================================================
-# 14. PDF: ПРАВИЛА
+# 15. PDF — ПРАВИЛА
 # =====================================================================
 
 @dp.callback_query(F.data == "send_rules_pdf")
 async def cb_send_rules_pdf(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
     if os.path.exists(RULES_FILE_PATH):
+
         doc = FSInputFile(
             RULES_FILE_PATH,
-            filename="Правила_базы_отдыха_Русалочка.pdf",
+            filename="Правила_базы_отдыха_Русалочка.pdf"
         )
 
         await callback.message.answer_document(
@@ -862,29 +878,32 @@ async def cb_send_rules_pdf(
             caption=(
                 "📄 Официальные правила проживания "
                 "на базе отдыха «Русалочка»"
-            ),
+            )
         )
+
     else:
+
         await callback.message.answer(
-            "📄 Правила доступны на официальном сайте:\n"
+            "📄 Правила доступны на официальном сайте: "
             "https://rusalo4ka.com/"
         )
 
 
 # =====================================================================
-# 15. PDF: ОФЕРТА
+# 16. PDF — ОФЕРТА
 # =====================================================================
 
 @dp.callback_query(F.data == "send_oferta_pdf")
 async def cb_send_oferta_pdf(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
     if os.path.exists(OFERTA_FILE_PATH):
+
         doc = FSInputFile(
             OFERTA_FILE_PATH,
-            filename="Договор_оферты_Русалочка.pdf",
+            filename="Договор_оферты_Русалочка.pdf"
         )
 
         await callback.message.answer_document(
@@ -892,31 +911,33 @@ async def cb_send_oferta_pdf(
             caption=(
                 "📑 Договор публичной оферты "
                 "базы отдыха «Русалочка»"
-            ),
+            )
         )
+
     else:
+
         await callback.message.answer(
-            "📑 Договор оферты доступен "
-            "на официальном сайте:\n"
+            "📑 Договор оферты доступен на официальном сайте: "
             "https://rusalo4ka.com/"
         )
 
 
 # =====================================================================
-# 16. FAQ
+# 17. FAQ
 # =====================================================================
 
 @dp.message(F.text == "❓ Вопросы и ответы (FAQ)")
 async def msg_faq(message: types.Message):
+
     await message.answer(
         "Часто задаваемые вопросы:",
-        reply_markup=get_faq_kb(),
+        reply_markup=get_faq_kb()
     )
 
 
 @dp.callback_query(F.data == "faq_checkin")
 async def cb_faq_checkin(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
@@ -932,7 +953,7 @@ async def cb_faq_checkin(
 
 @dp.callback_query(F.data == "faq_checkout")
 async def cb_faq_checkout(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
@@ -947,7 +968,7 @@ async def cb_faq_checkout(
 
 @dp.callback_query(F.data == "faq_prepayment")
 async def cb_faq_prepayment(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
@@ -963,7 +984,7 @@ async def cb_faq_prepayment(
 
 @dp.callback_query(F.data == "faq_refund")
 async def cb_faq_refund(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
@@ -979,21 +1000,25 @@ async def cb_faq_refund(
 
 @dp.callback_query(F.data == "faq_pets")
 async def cb_faq_pets(
-    callback: types.CallbackQuery,
+    callback: types.CallbackQuery
 ):
     await callback.answer()
 
     ans = (
         "<b>Возможно размещение с животными?</b>\n\n"
+
         "— Разрешено исключительно с декоративными "
-        "собаками весом до 5–7 кг "
-        "в категории «Номер с кухней эко».\n"
+        "собаками весом до 5–7 кг в категории "
+        "«Номер с кухней эко».\n"
+
         "— Тариф: 800 руб./сутки.\n"
+
         "— Рекомендуется возвратный депозит: "
         "5 000 руб.\n"
+
         "— Выгул собак по территории базы запрещен.\n\n"
-        "📄 Ознакомьтесь с документами "
-        "по кнопкам ниже:"
+
+        "📄 Ознакомьтесь с документами по кнопкам ниже:"
     )
 
     kb = InlineKeyboardMarkup(
@@ -1001,33 +1026,36 @@ async def cb_faq_pets(
             [
                 InlineKeyboardButton(
                     text="📄 Правила проживания (PDF)",
-                    callback_data="send_rules_pdf",
+                    callback_data="send_rules_pdf"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📑 Договор оферты (PDF)",
-                    callback_data="send_oferta_pdf",
+                    callback_data="send_oferta_pdf"
                 )
-            ],
+            ]
         ]
     )
 
     await callback.message.answer(
         ans,
-        reply_markup=kb,
+        reply_markup=kb
     )
 
 
 # =====================================================================
-# 17. ОБРАТНАЯ СВЯЗЬ
+# 18. ОБРАТНАЯ СВЯЗЬ
 # =====================================================================
 
-@dp.message(F.text == "💬 Остались вопросы? Напишите нам")
+@dp.message(
+    F.text == "💬 Остались вопросы? Напишите нам"
+)
 async def msg_feedback(
     message: types.Message,
-    state: FSMContext,
+    state: FSMContext
 ):
+
     await state.set_state(
         SupportStates.waiting_for_question
     )
@@ -1035,6 +1063,7 @@ async def msg_feedback(
     prompt = (
         "💬 <b>Задать вопрос администратору "
         "базы отдыха</b>\n\n"
+
         "Напишите ваш вопрос следующим сообщением. "
         "Мы получим его и ответим вам прямо "
         "в этот диалог!"
@@ -1042,31 +1071,33 @@ async def msg_feedback(
 
     await message.answer(
         prompt,
-        reply_markup=get_cancel_reply_kb(),
+        reply_markup=get_cancel_reply_kb()
     )
 
 
 @dp.message(F.text == "❌ Отменить вопрос")
 async def msg_cancel_feedback(
     message: types.Message,
-    state: FSMContext,
+    state: FSMContext
 ):
+
     await state.clear()
 
     await message.answer(
         "Отправка вопроса отменена.",
-        reply_markup=get_main_reply_kb(),
+        reply_markup=get_main_reply_kb()
     )
 
 
 @dp.message(
     SupportStates.waiting_for_question,
-    F.chat.type == "private",
+    F.chat.type == "private"
 )
 async def process_guest_question(
     message: types.Message,
-    state: FSMContext,
+    state: FSMContext
 ):
+
     await state.clear()
 
     user_id = message.from_user.id
@@ -1077,49 +1108,43 @@ async def process_guest_question(
         "базы отдыха «Русалочка»!\n\n"
         "Мы ответим вам прямо в этот диалог "
         "в ближайшее время.",
-        reply_markup=get_main_reply_kb(),
+        reply_markup=get_main_reply_kb()
     )
 
     if ADMIN_CHAT_ID != 0:
 
         ticket_text = (
-            "📩 <b>НОВЫЙ ВОПРОС ОТ ГОСТЯ "
-            "В TELEGRAM</b>\n"
+            "📩 <b>НОВЫЙ ВОПРОС ОТ ГОСТЯ В TELEGRAM</b>\n"
+
             f"👤 <b>Имя:</b> {name}\n"
-            f"🆔 <b>ID:</b> "
-            f"<code>{user_id}</code>\n\n"
-            f"💬 <b>Вопрос:</b>\n"
-            f"«{message.text}»\n\n"
-            "👉 Чтобы ответить гостю, "
-            "ответьте цитатой (Reply) "
-            "на это сообщение.\n"
+            f"🆔 <b>ID:</b> <code>{user_id}</code>\n\n"
+
+            f"💬 <b>Вопрос:</b>\n«{message.text}»\n\n"
+
+            "👉 Чтобы ответить гостю, ответьте цитатой "
+            "(Reply) на это сообщение.\n"
+
             f"#user_{user_id}"
         )
 
-        try:
-            await bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=ticket_text,
-            )
-
-        except Exception:
-            logging.exception(
-                "Не удалось отправить вопрос "
-                "администратору"
-            )
+        await bot.send_message(
+            chat_id=ADMIN_CHAT_ID,
+            text=ticket_text
+        )
 
 
 # =====================================================================
-# 18. ОТВЕТ АДМИНИСТРАТОРА
+# 19. ОТВЕТ АДМИНИСТРАТОРА
 # =====================================================================
 
 @dp.message(
     F.chat.id == ADMIN_CHAT_ID,
-    F.reply_to_message,
+    F.reply_to_message
 )
 async def process_admin_reply(
-    message: types.Message,
+    message: types.Message
 ):
+
     replied_text = (
         message.reply_to_message.text
         or message.reply_to_message.caption
@@ -1128,7 +1153,7 @@ async def process_admin_reply(
 
     match = re.search(
         r"#user_(\d+)",
-        replied_text,
+        replied_text
     )
 
     if match and message.text:
@@ -1140,31 +1165,36 @@ async def process_admin_reply(
         answer_to_guest = (
             "💬 <b>Ответ от администрации "
             "базы отдыха «Русалочка»:</b>\n\n"
+
             f"{message.text}\n\n"
+
             "---------------------------------\n"
+
             "Если у вас остались вопросы, "
             "напишите их прямо сюда!"
         )
 
         try:
+
             await bot.send_message(
                 chat_id=target_guest_id,
-                text=answer_to_guest,
+                text=answer_to_guest
             )
 
             await message.reply(
                 "✅ Ответ успешно доставлен гостю!"
             )
 
-        except Exception as error:
+        except Exception as e:
+
             await message.reply(
-                "⚠️ Не удалось доставить ответ "
-                f"пользователю {target_guest_id}: {error}"
+                f"⚠️ Не удалось доставить ответ "
+                f"пользователю {target_guest_id}: {e}"
             )
 
 
 # =====================================================================
-# 19. ЗАПУСК
+# 20. ЗАПУСК
 # =====================================================================
 
 async def main():
@@ -1175,24 +1205,17 @@ async def main():
             "%(asctime)s - "
             "%(levelname)s - "
             "%(message)s"
-        ),
+        )
     )
 
     logging.info("=" * 60)
-    logging.info(
-        "ЗАПУСК TELEGRAM-БОТА"
-    )
-    logging.info(
-        "Версия: %s",
-        BOT_VERSION
-    )
+    logging.info("ЗАПУСК TELEGRAM-БОТА")
+    logging.info("Версия: %s", BOT_VERSION)
     logging.info("=" * 60)
 
     try:
 
-        # Получаем информацию о боте.
-        # Это позволяет убедиться, что используется
-        # правильный токен.
+        # Проверяем токен до запуска polling.
         me = await bot.get_me()
 
         logging.info(
@@ -1206,16 +1229,11 @@ async def main():
         )
 
         logging.info(
-            "Администратор: %s",
-            ADMIN_CHAT_ID
-        )
-
-        logging.info(
             "Подготовка polling..."
         )
 
-        # Удаляем webhook перед polling.
-        # Очередь старых сообщений НЕ удаляем.
+        # Удаляем webhook, чтобы polling работал корректно.
+        # Старые обновления НЕ удаляем.
         await bot.delete_webhook(
             drop_pending_updates=False
         )
@@ -1231,6 +1249,7 @@ async def main():
         await dp.start_polling(bot)
 
     except Exception:
+
         logging.exception(
             "КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ БОТА"
         )
@@ -1238,18 +1257,18 @@ async def main():
         raise
 
     finally:
+
         logging.info(
             "Работа бота завершена."
         )
 
-        await bot.session.close()
-
 
 # =====================================================================
-# 20. ENTRY POINT
+# 21. ENTRY POINT
 # =====================================================================
 
 if __name__ == "__main__":
+
     import asyncio
 
     asyncio.run(main())
