@@ -10,6 +10,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import (
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardRemove,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     FSInputFile,
@@ -22,7 +25,7 @@ from dotenv import load_dotenv
 # =====================================================================
 load_dotenv()
 
-BOT_TOKEN = "8698519060:AAF4eSk6Su-lcWbTpY6mfkJtd1Nv-dP0WCg".strip()
+BOT_TOKEN = "8698519060:AAF4eSk6Su-lcWbTpY6mfkJtd1Nv-dP0WCg"
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "-79780607715530"))
 
 BOOKING_URL = "https://reservationsteps.ru/rooms/index/8dc26407-5b2f-46e5-8597-ebfc46cf8111?dfrom=11-06-2027&dto=20-06-2027&adults=2&lang=ru"
@@ -201,7 +204,6 @@ ROOMS_CATALOG: Dict[str, Dict[str, Any]] = {
 }
 
 def get_room_photos(folder_name: str) -> List[str]:
-    """Сканирует папку images/<folder_name> и возвращает пути к файлам."""
     folder_path = os.path.join("images", folder_name)
     if not os.path.isdir(folder_path):
         return []
@@ -220,31 +222,35 @@ def get_room_photos(folder_name: str) -> List[str]:
 # =====================================================================
 # 2. КЛАВИАТУРЫ
 # =====================================================================
-def get_main_menu_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏡 Список номеров", callback_data="menu_rooms"), InlineKeyboardButton(text="📝 Забронировать", callback_data="menu_book")],
-        [InlineKeyboardButton(text="🌴 О базе", callback_data="menu_about"), InlineKeyboardButton(text="🎡 Услуги и сервис", callback_data="menu_infra")],
-        [InlineKeyboardButton(text="⭐ Отзывы", callback_data="menu_reviews"), InlineKeyboardButton(text="❓ Вопросы и ответы (FAQ)", callback_data="menu_faq")],
-        [InlineKeyboardButton(text="📞 Контакты и локация", callback_data="menu_contacts")],
-        [InlineKeyboardButton(text="💬 Задать вопрос администратору", callback_data="menu_feedback")]
-    ])
+def get_main_reply_kb() -> ReplyKeyboardMarkup:
+    """Нижняя панель меню, как была изначально"""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🏡 Наши номера"), KeyboardButton(text="📝 Забронировать")],
+            [KeyboardButton(text="🌴 О базе"), KeyboardButton(text="🎡 Инфраструктура и услуги")],
+            [KeyboardButton(text="⭐ Отзывы"), KeyboardButton(text="❓ Вопросы и ответы (FAQ)")],
+            [KeyboardButton(text="📞 Контакты и локация")],
+            [KeyboardButton(text="💬 Остались вопросы? Напишите нам")]
+        ],
+        resize_keyboard=True
+    )
 
-def get_cancel_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отменить вопрос", callback_data="cancel_feedback")]
-    ])
+def get_cancel_reply_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="❌ Отменить вопрос")]],
+        resize_keyboard=True
+    )
 
 def get_rooms_list_kb() -> InlineKeyboardMarkup:
     buttons = []
     for key, data in ROOMS_CATALOG.items():
         buttons.append([InlineKeyboardButton(text=f"🏡 {data['title']}", callback_data=f"view_room_{key}")])
-    buttons.append([InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_single_room_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🛎 Забронировать этот номер", url=BOOKING_URL)],
-        [InlineKeyboardButton(text="⬅️ Назад к списку номеров", callback_data="menu_rooms")]
+        [InlineKeyboardButton(text="⬅️ Назад к списку номеров", callback_data="menu_rooms_inline")]
     ])
 
 def get_faq_kb() -> InlineKeyboardMarkup:
@@ -254,58 +260,40 @@ def get_faq_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="При бронировании нужно вносить предоплату?", callback_data="faq_prepayment")],
         [InlineKeyboardButton(text="Предоплата возвратная?", callback_data="faq_refund")],
         [InlineKeyboardButton(text="Возможно размещение с животными?", callback_data="faq_pets")],
-        [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")],
-        [InlineKeyboardButton(text="💬 Задать свой вопрос", callback_data="menu_feedback")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")]
     ])
 
 # =====================================================================
 # 3. ИНИЦИАЛИЗАЦИЯ И ХЭНДЛЕРЫ
 # =====================================================================
-# Исправленная строка инициализации для aiogram >= 3.7.0
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher(storage=MemoryStorage())
+
+WELCOME_MESSAGE = (
+    "Добро пожаловать в базу отдыха «Русалочка»! 🌊\n\n"
+    "Семейный отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
+    "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
+    "📅 <b>Период работы:</b> с 11 июня по 15 сентября[cite: 17]\n"
+    "🕒 <b>Заезд</b> — с 13:00 | <b>Выезд</b> — до 11:00\n\n"
+    "Выберите нужный раздел в меню ниже ⬇️"
+)
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-    welcome_text = (
-        "Добро пожаловать в базу отдыха «Русалочка»! 🌊\n\n"
-        "Семейный отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
-        "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
-        "📅 <b>Период работы:</b> с 11 июня по 15 сентября[cite: 17]\n"
-        "🕒 <b>Заезд</b> — с 13:00 | <b>Выезд</b> — до 11:00\n\n"
-        "Выберите нужный раздел в меню ниже ⬇️"
-    )
-    await message.answer(welcome_text, reply_markup=get_main_menu_kb())
+    await message.answer(WELCOME_MESSAGE, reply_markup=get_main_reply_kb())
 
-@dp.callback_query(F.data == "menu_root")
-async def cb_menu_root(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback.answer()
-    welcome_text = (
-        "Добро пожаловать в базу отдыха «Русалочка»! 🌊\n\n"
-        "Семейный отдых на песчаном побережье Черного моря (Анапа, ст. Благовещенская).\n"
-        "Зеленая территория, уютные эко-домики и номера с оборудованной кухней!\n\n"
-        "📅 <b>Период работы:</b> с 11 июня по 15 сентября[cite: 17]\n"
-        "🕒 <b>Заезд</b> — с 13:00 | <b>Выезд</b> — до 11:00\n\n"
-        "Выберите нужный раздел в меню ниже ⬇️"
-    )
-    if callback.message.photo:
-        await callback.message.delete()
-        await callback.message.answer(welcome_text, reply_markup=get_main_menu_kb())
-    else:
-        await callback.message.edit_text(welcome_text, reply_markup=get_main_menu_kb())
+# 1. НАШИ НОМЕРА
+@dp.message(F.text == "🏡 Наши номера")
+async def msg_rooms(message: types.Message):
+    text = "🏡 <b>Номерной фонд базы отдыха «Русалочка»:</b>\n\nВыберите категорию для просмотра фотографий и описания:"
+    await message.answer(text, reply_markup=get_rooms_list_kb())
 
-@dp.callback_query(F.data == "menu_rooms")
-async def cb_rooms(callback: types.CallbackQuery):
+@dp.callback_query(F.data == "menu_rooms_inline")
+async def cb_rooms_inline(callback: types.CallbackQuery):
     await callback.answer()
     text = "🏡 <b>Номерной фонд базы отдыха «Русалочка»:</b>\n\nВыберите категорию для просмотра фотографий и описания:"
-    if callback.message.photo:
-        await callback.message.delete()
-        await callback.message.answer(text, reply_markup=get_rooms_list_kb())
-    else:
-        await callback.message.edit_text(text, reply_markup=get_rooms_list_kb())
+    await callback.message.answer(text, reply_markup=get_rooms_list_kb())
 
 @dp.callback_query(F.data.startswith("view_room_"))
 async def cb_view_room(callback: types.CallbackQuery):
@@ -335,9 +323,9 @@ async def cb_view_room(callback: types.CallbackQuery):
     else:
         await callback.message.answer(room["description"], reply_markup=get_single_room_kb())
 
-@dp.callback_query(F.data == "menu_book")
-async def cb_book(callback: types.CallbackQuery):
-    await callback.answer()
+# 2. ЗАБРОНИРОВАТЬ
+@dp.message(F.text == "📝 Забронировать")
+async def msg_book(message: types.Message):
     book_info = (
         "📝 <b>Онлайн-бронирование номеров</b>\n\n"
         "В нашем официальном модуле вы можете в реальном времени выбрать удобные даты, "
@@ -349,21 +337,20 @@ async def cb_book(callback: types.CallbackQuery):
         "• Бесплатная отмена: возможна за 14 дней до заезда"
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Перейти к бронированию и оплате", url=BOOKING_URL)],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="💳 Перейти к бронированию и оплате", url=BOOKING_URL)]
     ])
-    await callback.message.edit_text(book_info, reply_markup=kb)
+    await message.answer(book_info, reply_markup=kb)
 
-@dp.callback_query(F.data == "menu_infra")
-async def cb_infra(callback: types.CallbackQuery):
-    await callback.answer()
+# 3. ИНФРАСТРУКТУРА И УСЛУГИ
+@dp.message(F.text == "🎡 Инфраструктура и услуги")
+async def msg_infra(message: types.Message):
     infra_text = (
         "🎡 <b>ИНФРАСТРУКТУРА И УСЛУГИ</b>\n\n"
         "✅ <b>ВКЛЮЧЕНО В СТОИМОСТЬ:</b>\n"
         "• 👶 Детская игровая площадка\n"
         "• ⚽ Настольный теннис, футбол, шахматы, спортинвентарь\n"
         "• 🥩 Оборудованная мангальная зона (решетки, шампуры, печь, казан 12 л)\n"
-        "• 🌸 Зеленая ухоженная территория (350 кустов роз и 2000 кустов лаванды)[cite: 18]\n\n"
+        "• 🌸 Зеленая ухоженная территория (350 кустов роз и 2000 кустов лаванды)\n\n"
         "💲 <b>ДОПОЛНИТЕЛЬНЫЕ УСЛУГИ:</b>\n"
         "• 🎨 Творческие мастер-классы и шоу\n"
         "• 🧺 Прачечная и гладильная комната\n"
@@ -371,14 +358,11 @@ async def cb_infra(callback: types.CallbackQuery):
         "  — Цена: 25 ₽ / 1 кВт·ч[cite: 18]\n"
         "  — Время работы: с 9:00 до 19:00, для гостей базы отдыха — круглосуточно[cite: 18]"
     )
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
-    ])
-    await callback.message.edit_text(infra_text, reply_markup=kb)
+    await message.answer(infra_text)
 
-@dp.callback_query(F.data == "menu_about")
-async def cb_about(callback: types.CallbackQuery):
-    await callback.answer()
+# 4. О БАЗЕ
+@dp.message(F.text == "🌴 О базе")
+async def msg_about(message: types.Message):
     about_text = (
         "🌴 <b>База отдыха «Русалочка»</b>\n\n"
         "• Чистейший широкий песчаный пляж Черного моря\n"
@@ -386,42 +370,38 @@ async def cb_about(callback: types.CallbackQuery):
         "• Комплексное 3-разовое питание включено во все категории номеров\n"
         "• Период сезона: с 11 июня по 15 сентября[cite: 17]\n\n"
         "🌐 <b>Официальные сайты:</b>\n"
-        "• https://rusalo4ka.com/[cite: 19]\n"
-        "• https://русалочка.рф[cite: 19]"
+        "• https://rusalo4ka.com/\n"
+        "• https://русалочка.рф"
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🌐 rusalo4ka.com", url="https://rusalo4ka.com/"), InlineKeyboardButton(text="🌐 русалочка.рф", url="https://xn--80aaahx7adkc.xn--p1ai/")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="🌐 rusalo4ka.com", url="https://rusalo4ka.com/"), InlineKeyboardButton(text="🌐 русалочка.рф", url="https://xn--80aaahx7adkc.xn--p1ai/")]
     ])
-    await callback.message.edit_text(about_text, reply_markup=kb)
+    await message.answer(about_text, reply_markup=kb)
 
-@dp.callback_query(F.data == "menu_reviews")
-async def cb_reviews(callback: types.CallbackQuery):
-    await callback.answer()
+# 5. ОТЗЫВЫ
+@dp.message(F.text == "⭐ Отзывы")
+async def msg_reviews(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⭐ Отзывы на Яндекс.Картах", url=REVIEWS_YANDEX_URL)],
-        [InlineKeyboardButton(text="🗺️ Отзывы в 2ГИС", url=REVIEWS_2GIS_URL)],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="🗺️ Отзывы в 2ГИС", url=REVIEWS_2GIS_URL)]
     ])
-    await callback.message.edit_text("⭐ Отзывы наших гостей на онлайн-картах:", reply_markup=kb)
+    await message.answer("⭐ Отзывы наших гостей на онлайн-картах:", reply_markup=kb)
 
-@dp.callback_query(F.data == "menu_contacts")
-async def cb_contacts(callback: types.CallbackQuery):
-    await callback.answer()
+# 6. КОНТАКТЫ И ЛОКАЦИЯ
+@dp.message(F.text == "📞 Контакты и локация")
+async def msg_contacts(message: types.Message):
     contacts_text = (
         "📞 <b>Контакты базы отдыха «Русалочка»:</b>\n\n"
-        "📍 <b>Адрес:</b> Краснодарский край, г. Анапа, ст. Благовещенская, ул. Прибрежная, д. 13, б/о «Русалочка»[cite: 21]\n"
+        "📍 <b>Адрес:</b> Краснодарский край, г. Анапа, ст. Благовещенская, ул. Прибрежная, д. 13, б/о «Русалочка»\n"
         "📞 <b>Отдел бронирования:</b> +7 (918) 47-74-366\n"
         "✉️ <b>E-mail:</b> anaparusalochka@rambler.ru\n"
-        "🌐 <b>Сайты:</b> https://rusalo4ka.com/ | https://русалочка.рф[cite: 19]"
+        "🌐 <b>Сайты:</b> https://rusalo4ka.com/ | https://русалочка.рф"
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧭 Маршрут в Яндекс Картах", url=YANDEX_ROUTE_URL)],
-        [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")],
-        [InlineKeyboardButton(text="💬 Задать вопрос в чате", callback_data="menu_feedback")],
-        [InlineKeyboardButton(text="⬅️️ В главное меню", callback_data="menu_root")]
+        [InlineKeyboardButton(text="📄 Посмотреть правила (PDF)", callback_data="send_rules_pdf")]
     ])
-    await callback.message.edit_text(contacts_text, reply_markup=kb)
+    await message.answer(contacts_text, reply_markup=kb)
 
 @dp.callback_query(F.data == "send_rules_pdf")
 async def cb_send_rules_pdf(callback: types.CallbackQuery):
@@ -430,40 +410,36 @@ async def cb_send_rules_pdf(callback: types.CallbackQuery):
         doc = FSInputFile(RULES_FILE_PATH, filename="Правила_базы_отдыха_Русалочка.pdf")
         await callback.message.answer_document(document=doc, caption="📄 Официальные правила проживания на базе отдыха «Русалочка»")
     else:
-        await callback.message.answer("📄 Правила доступны на официальном сайте: https://rusalo4ka.com/[cite: 19]")
+        await callback.message.answer("📄 Правила доступны на официальном сайте: https://rusalo4ka.com/")
 
-@dp.callback_query(F.data == "menu_faq")
-async def cb_faq(callback: types.CallbackQuery):
-    await callback.answer()
-    await callback.message.edit_text("Часто задаваемые вопросы:", reply_markup=get_faq_kb())
+# 7. FAQ
+@dp.message(F.text == "❓ Вопросы и ответы (FAQ)")
+async def msg_faq(message: types.Message):
+    await message.answer("Часто задаваемые вопросы:", reply_markup=get_faq_kb())
 
 @dp.callback_query(F.data == "faq_checkin")
 async def cb_faq_checkin(callback: types.CallbackQuery):
     await callback.answer()
     ans = "<b>Во сколько заселение?</b>\n\n— с 13:00, но если Вы приедете раньше и ваш номер будет уже свободен, мы заселим Вас раньше."
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="menu_faq")]])
-    await callback.message.edit_text(ans, reply_markup=kb)
+    await callback.message.answer(ans)
 
 @dp.callback_query(F.data == "faq_checkout")
 async def cb_faq_checkout(callback: types.CallbackQuery):
     await callback.answer()
     ans = "<b>Во сколько выселение?</b>\n\n— освободить номер нужно до 11:00, ключи и браслеты сдаются в администрацию."
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="menu_faq")]])
-    await callback.message.edit_text(ans, reply_markup=kb)
+    await callback.message.answer(ans)
 
 @dp.callback_query(F.data == "faq_prepayment")
 async def cb_faq_prepayment(callback: types.CallbackQuery):
     await callback.answer()
     ans = "<b>При бронировании нужно вносить предоплату?</b>\n\n— бронирование выбранной категории номера производится после перечисления предоплаты (30% от полной стоимости проживания)."
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="menu_faq")]])
-    await callback.message.edit_text(ans, reply_markup=kb)
+    await callback.message.answer(ans)
 
 @dp.callback_query(F.data == "faq_refund")
 async def cb_faq_refund(callback: types.CallbackQuery):
     await callback.answer()
     ans = "<b>Предоплата возвратная?</b>\n\n— бесплатная отмена бронирования возможна за 14 дней до заезда, после — взимается 100% от суммы предоплаты."
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="menu_faq")]])
-    await callback.message.edit_text(ans, reply_markup=kb)
+    await callback.message.answer(ans)
 
 @dp.callback_query(F.data == "faq_pets")
 async def cb_faq_pets(callback: types.CallbackQuery):
@@ -476,29 +452,24 @@ async def cb_faq_pets(callback: types.CallbackQuery):
         "📄 Ознакомьтесь с подробными правилами проживания по кнопке ниже:"
     )
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📄 Скачать полные правила (PDF)", callback_data="send_rules_pdf")],
-        [InlineKeyboardButton(text="⬅️ Назад в FAQ", callback_data="menu_faq")]
+        [InlineKeyboardButton(text="📄 Скачать полные правила (PDF)", callback_data="send_rules_pdf")]
     ])
-    await callback.message.edit_text(ans, reply_markup=kb)
+    await callback.message.answer(ans, reply_markup=kb)
 
-# =====================================================================
-# 4. ПОДДЕРЖКА И МОСТ С ЧАТОМ АДМИНИСТРАТОРОВ
-# =====================================================================
-@dp.callback_query(F.data == "menu_feedback")
-async def cb_feedback(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer()
+# 8. ОБРАТНАЯ СВЯЗЬ / ВОПРОС АДМИНИСТРАТОРУ
+@dp.message(F.text == "💬 Остались вопросы? Напишите нам")
+async def msg_feedback(message: types.Message, state: FSMContext):
     await state.set_state(SupportStates.waiting_for_question)
     prompt = (
         "💬 <b>Задать вопрос администратору базы отдыха</b>\n\n"
         "Напишите ваш вопрос следующим сообщением. Мы получим его и ответим вам прямо в этот диалог!"
     )
-    await callback.message.answer(prompt, reply_markup=get_cancel_kb())
+    await message.answer(prompt, reply_markup=get_cancel_reply_kb())
 
-@dp.callback_query(F.data == "cancel_feedback")
-async def cb_cancel_feedback(callback: types.CallbackQuery, state: FSMContext):
+@dp.message(F.text == "❌ Отменить вопрос")
+async def msg_cancel_feedback(message: types.Message, state: FSMContext):
     await state.clear()
-    await callback.answer()
-    await callback.message.answer("Отправка вопроса отменена.", reply_markup=get_main_menu_kb())
+    await message.answer("Отправка вопроса отменена.", reply_markup=get_main_reply_kb())
 
 @dp.message(SupportStates.waiting_for_question, F.chat.type == "private")
 async def process_guest_question(message: types.Message, state: FSMContext):
@@ -509,7 +480,7 @@ async def process_guest_question(message: types.Message, state: FSMContext):
     await message.answer(
         "✅ Ваш вопрос передан администраторам базы отдыха «Русалочка»!\n\n"
         "Мы ответим вам прямо в этот диалог в ближайшее время.",
-        reply_markup=get_main_menu_kb()
+        reply_markup=get_main_reply_kb()
     )
 
     if ADMIN_CHAT_ID != 0:
@@ -541,20 +512,8 @@ async def process_admin_reply(message: types.Message):
         except Exception as e:
             await message.reply(f"⚠️ Не удалось доставить ответ пользователю {target_guest_id}: {e}")
 
-@dp.message(F.chat.type == "private")
-async def fallback_private(message: types.Message):
-    prompt = (
-        "Я получил ваше сообщение! 🌊\n\n"
-        "Если вы хотите передать вопрос администратору базы «Русалочка», нажмите кнопку ниже:"
-    )
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💬 Задать вопрос администратору", callback_data="menu_feedback")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="menu_root")]
-    ])
-    await message.answer(prompt, reply_markup=kb)
-
 # =====================================================================
-# 5. ЗАПУСК БОТА
+# 4. ЗАПУСК БОТА
 # =====================================================================
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
